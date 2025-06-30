@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "947888468186",
+    "project_id": "allowance-manager-a7751",
+    "storage_bucket": "allowance-manager-a7751.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947888468186:android:ee310d6dc5a8656b58b5e3",
+        "android_client_info": {
+          "package_name": "com.example.allowance_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqKZ-jZH9X2qTsimCwT_KTEzgW1DrPN-0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
