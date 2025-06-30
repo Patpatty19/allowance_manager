@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'user_screen.dart';
+import 'admin_screen.dart';
 
 void main() {
   runApp(const MainApp());
@@ -17,7 +18,12 @@ class MainMenuScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AdminScreen()),
+                );
+              },
               child: const Text('Admin'),
             ),
             const SizedBox(height: 20),
