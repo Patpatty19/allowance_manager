@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_transaction_history.dart';
 
 class UserScreen extends StatefulWidget {
-  const UserScreen({super.key});
+  final String? userId;
+  final String? userName;
+  
+  const UserScreen({super.key, this.userId, this.userName});
 
   @override
   State<UserScreen> createState() => _UserScreenState();
@@ -18,13 +21,77 @@ class _UserScreenState extends State<UserScreen> {
     return int.tryParse(RegExp(r'\d+').stringMatch(amount) ?? '0') ?? 0;
   }
 
+  Future<void> _completeTask(_Task task) async {
+    try {
+      // Mark task as completed
+      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': true});
+      
+      // Extract reward amount from reward string (e.g., "+₱50" -> "50")
+      final rewardAmount = _parseReward(task.reward);
+      
+      // Create transaction record for the reward
+      if (rewardAmount > 0 && widget.userId != null) {
+        await FirebaseFirestore.instance.collection('transactions').add({
+          'name': 'Task Completed: ${task.title}',
+          'amount': '+$rewardAmount', // Positive amount for earnings
+          'timestamp': FieldValue.serverTimestamp(),
+          'userId': widget.userId,
+          'type': 'task_reward', // Mark this as a task reward transaction
+        });
+      }
+    } catch (e) {
+      // Show error if something goes wrong
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error completing task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _uncompleteTask(_Task task) async {
+    try {
+      // Mark task as not completed
+      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': false});
+      
+      // Remove the corresponding reward transaction
+      final rewardTransactions = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: widget.userId)
+          .where('type', isEqualTo: 'task_reward')
+          .get();
+      
+      // Find and delete the transaction for this specific task
+      for (final doc in rewardTransactions.docs) {
+        final data = doc.data();
+        if (data['name']?.toString().contains(task.title) == true) {
+          await doc.reference.delete();
+          break; // Only delete the first matching transaction
+        }
+      }
+    } catch (e) {
+      // Show error if something goes wrong
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uncompleting task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Welcome User!',
-          style: TextStyle(
+        title: Text(
+          widget.userName != null ? 'Welcome ${widget.userName}!' : 'Welcome User!',
+          style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -32,31 +99,66 @@ class _UserScreenState extends State<UserScreen> {
         backgroundColor: Colors.green,
         automaticallyImplyLeading: false,
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+      body: widget.userId == null 
+          ? const Center(child: Text('Please log in to view your tasks'))
+          : StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('tasks')
+            .snapshots(),
         builder: (context, taskSnapshot) {
           if (taskSnapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (taskSnapshot.hasError) {
-            return Center(child: Text('Error: \\${taskSnapshot.error}'));
+            return Center(child: Text('Error: ${taskSnapshot.error}'));
           }
-          final tasks = taskSnapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
-          final completedRewards = tasks.where((t) => t.completed).fold<int>(0, (sum, t) => sum + _parseReward(t.reward));
+          
+          // Filter tasks by userId (or show all if no userId field exists for backward compatibility)
+          final allTasks = taskSnapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
+          final tasks = allTasks.where((task) => 
+            task.userId == widget.userId || 
+            task.userId == null || 
+            task.userId!.isEmpty
+          ).toList();
 
           return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('transactions').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('transactions')
+                .snapshots(),
             builder: (context, txSnapshot) {
               if (txSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (txSnapshot.hasError) {
-                return Center(child: Text('Error: \\${txSnapshot.error}'));
+                return Center(child: Text('Error: ${txSnapshot.error}'));
               }
-              final transactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
-              final spent = transactions.fold<int>(0, (sum, tx) => sum + _parseAmount(tx['amount']?.toString() ?? '0'));
+              
+              // Filter transactions by userId (or show all if no userId field for backward compatibility)
+              final allTransactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+              final transactions = allTransactions.where((tx) => 
+                tx['userId'] == widget.userId || 
+                tx['userId'] == null || 
+                (tx['userId'] as String?)?.isEmpty == true
+              ).toList();
+              
+              // Calculate spent and earned amounts from transactions only
+              // Note: Task rewards are automatically added as + transactions when tasks are completed
+              int spent = 0;
+              int earned = 0;
+              
+              for (final tx in transactions) {
+                final amountStr = tx['amount']?.toString() ?? '0';
+                final amount = _parseAmount(amountStr);
+                
+                if (amountStr.startsWith('+')) {
+                  earned += amount; // Task rewards and other earnings
+                } else {
+                  spent += amount; // Regular spending
+                }
+              }
+              
               final initial = 500;
-              final balance = initial + completedRewards - spent;
+              final balance = initial + earned - spent;
 
               return Column(
                 children: [
@@ -67,12 +169,21 @@ class _UserScreenState extends State<UserScreen> {
                     child: Column(
                       children: [
                         Text(
-                          'Balance: ₱$balance',
+                          'Current Balance: ₱$balance',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                            color: balance >= 0 ? Colors.green : Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Starting: ₱$initial | Earned: ₱$earned | Spent: ₱$spent',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
                           ),
                         ),
                       ],
@@ -139,7 +250,7 @@ class _UserScreenState extends State<UserScreen> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => const UserTransactionHistoryScreen(),
+                                    builder: (context) => UserTransactionHistoryScreen(userId: widget.userId),
                                   ),
                                 );
                               },
@@ -230,9 +341,7 @@ class _UserScreenState extends State<UserScreen> {
                 const SizedBox(width: 8),
                 if (!task.completed)
                   ElevatedButton(
-                    onPressed: () async {
-                      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': true});
-                    },
+                    onPressed: () => _completeTask(task),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -242,9 +351,7 @@ class _UserScreenState extends State<UserScreen> {
                   )
                 else
                   ElevatedButton(
-                    onPressed: () async {
-                      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': false});
-                    },
+                    onPressed: () => _uncompleteTask(task),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey,
                       foregroundColor: Colors.white,
@@ -266,8 +373,10 @@ class _Task {
   final String title;
   final String reward;
   final String description;
+  final String? userId;
   bool completed;
-  _Task(this.id, this.title, this.reward, this.description, this.completed);
+  
+  _Task(this.id, this.title, this.reward, this.description, this.completed, this.userId);
 
   factory _Task.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -277,6 +386,7 @@ class _Task {
       data['reward'] ?? '',
       data['description'] ?? '',
       data['completed'] ?? false,
+      data['userId'], // This will be null for old tasks
     );
   }
 }

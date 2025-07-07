@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserTransactionHistoryScreen extends StatefulWidget {
-  const UserTransactionHistoryScreen({super.key});
+  final String? userId;
+  
+  const UserTransactionHistoryScreen({super.key, this.userId});
 
   @override
   State<UserTransactionHistoryScreen> createState() => _UserTransactionHistoryScreenState();
@@ -60,15 +62,18 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                     onPressed: () async {
+                      final navigator = Navigator.of(context);
                       final name = nameController.text.trim();
                       final amount = amountController.text.trim();
-                      if (name.isNotEmpty && amount.isNotEmpty) {
+                      if (name.isNotEmpty && amount.isNotEmpty && widget.userId != null) {
                         await FirebaseFirestore.instance.collection('transactions').add({
                           'name': name,
-                          'amount': amount,
+                          'amount': amount, // Regular spending transaction (no + prefix)
                           'timestamp': FieldValue.serverTimestamp(),
+                          'userId': widget.userId,
+                          // No 'type' field means it's a regular spending transaction
                         });
-                        Navigator.pop(context);
+                        navigator.pop();
                       }
                     },
                     child: const Text('Add'),
@@ -116,10 +121,15 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
           ),
         ],
       ),
-      body: Stack(
+      body: widget.userId == null 
+          ? const Center(child: Text('No user selected'))
+          : Stack(
         children: [
           StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('transactions').orderBy('timestamp', descending: true).snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('transactions')
+                .where('userId', isEqualTo: widget.userId)
+                .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -163,12 +173,24 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                           tx.name,
                           style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87),
                         ),
+                        subtitle: tx.type == 'task_reward' 
+                            ? const Text(
+                                'Task Reward',
+                                style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                              )
+                            : null,
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              '-₱${tx.amount}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
+                              tx.amount.startsWith('+') 
+                                  ? '+₱${tx.amount.substring(1)}' // Keep the + for rewards
+                                  : '-₱${tx.amount}', // Add - for spending
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 16, 
+                                color: tx.amount.startsWith('+') ? Colors.green : Colors.red,
+                              ),
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red, size: 22),
@@ -211,8 +233,8 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
             child: FloatingActionButton(
               backgroundColor: Colors.green,
               onPressed: () => _showAddTransactionSheet(context),
-              child: const Icon(Icons.add, size: 32, color: Colors.white),
               tooltip: 'Add Transaction',
+              child: const Icon(Icons.add, size: 32, color: Colors.white),
             ),
           ),
         ],
@@ -290,7 +312,9 @@ class _Transaction {
   final String name;
   final String amount;
   final DateTime? timestamp;
-  _Transaction(this.id, this.name, this.amount, this.timestamp);
+  final String? type;
+  
+  _Transaction(this.id, this.name, this.amount, this.timestamp, this.type);
 
   factory _Transaction.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -299,11 +323,7 @@ class _Transaction {
       data['name'] ?? '',
       data['amount'] ?? '',
       (data['timestamp'] as Timestamp?)?.toDate(),
+      data['type'], // This will be null for old transactions
     );
   }
-}
-
-// Helper to parse reward string to int
-int _parseReward(String reward) {
-  return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
 }

@@ -1,27 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'user_screen.dart';
-import 'admin_login.dart'; // Changed this line
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'firebase_options.dart';
+import 'user_login_screen.dart';
+import 'admin_login.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kIsWeb) {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: "AIzaSyAV0Txs5qtALv_DwpzplB1dabLwmMTODnA",
-        authDomain: "allowance-manager-a7751.firebaseapp.com",
-        projectId: "allowance-manager-a7751",
-        storageBucket: "allowance-manager-a7751.appspot.com",
-        messagingSenderId: "947888468186",
-        appId: "1:947888468186:web:0d3dd1fe1aa4464058b5e3",
-        measurementId: "G-QCXYJ20LFC"
-      ),
-    );
-  } else {
-    await Firebase.initializeApp();
-  }
+  
+  // Initialize Firebase for all platforms (Windows, Web, Mobile)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(MainApp());
 }
 
@@ -36,6 +26,23 @@ class MainMenuScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Your logo
+            Image.asset(
+              'assets/images/logo.png',
+              width: 250,
+              height: 250,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Personal Allowance Manager',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -50,7 +57,7 @@ class MainMenuScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const UserScreen()),
+                  MaterialPageRoute(builder: (context) => const UserLoginScreen()),
                 );
               },
               child: const Text('User'),

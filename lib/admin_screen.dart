@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'change_password.dart';
+import 'user_management_screen.dart';
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
   @override
+  State<AdminScreen> createState() => _AdminScreenState();
+}
+
+class _AdminScreenState extends State<AdminScreen> {
+  String? selectedUserId;
+  String? selectedUserName;
+  final ValueNotifier<String> taskSortOrder = ValueNotifier<String>('latest');
+  final ValueNotifier<String> sortOrder = ValueNotifier<String>('desc');
+
+  int _parseReward(String reward) {
+    return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
+  }
+  
+  int _parseAmount(String amount) {
+    return int.tryParse(RegExp(r'\d+').stringMatch(amount) ?? '0') ?? 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ValueNotifier<String> taskSortOrder = ValueNotifier<String>('latest');
-    final ValueNotifier<String> sortOrder = ValueNotifier<String>('desc');
-
-    int _parseReward(String reward) {
-      return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
-    }
-    int _parseAmount(String amount) {
-      return int.tryParse(RegExp(r'\d+').stringMatch(amount) ?? '0') ?? 0;
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -27,45 +38,174 @@ class AdminScreen extends StatelessWidget {
         ),
         backgroundColor: Colors.green,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.people, color: Colors.white),
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+              );
+              if (result != null) {
+                setState(() {
+                  selectedUserId = result['id'];
+                  selectedUserName = result['name'];
+                });
+              }
+            },
+            tooltip: 'Manage Users',
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'change_password') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+                );
+              } else if (value == 'logout') {
+                _showLogoutDialog(context);
+              }
+            },
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(
+                value: 'change_password',
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Change Password'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
-        builder: (context, taskSnapshot) {
-          if (taskSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (taskSnapshot.hasError) {
-            return Center(child: Text('Error: \\${taskSnapshot.error}'));
-          }
-          final tasks = taskSnapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
-          final completedRewards = tasks.where((t) => t.completed).fold<int>(0, (sum, t) => sum + _parseReward(t.reward));
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('transactions').snapshots(),
+      body: selectedUserId == null
+          ? _buildUserSelectionScreen()
+          : StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('tasks')
+            .snapshots(),
+                builder: (context, taskSnapshot) {
+                  if (taskSnapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (taskSnapshot.hasError) {
+                    return Center(child: Text('Error: ${taskSnapshot.error}'));
+                  }
+                  
+                  return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('transactions')
+                .snapshots(),
             builder: (context, txSnapshot) {
               if (txSnapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (txSnapshot.hasError) {
-                return Center(child: Text('Error: \\${txSnapshot.error}'));
+                return Center(child: Text('Error: ${txSnapshot.error}'));
               }
-              final transactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
-              final spent = transactions.fold<int>(0, (sum, tx) => sum + _parseAmount(tx['amount']?.toString() ?? '0'));
+              
+              // Filter transactions by userId if a user is selected
+              final allTransactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+              final transactions = selectedUserId == null 
+                  ? allTransactions
+                  : allTransactions.where((tx) => 
+                      tx['userId'] == selectedUserId || 
+                      (tx['userId'] == null && selectedUserId != null) // Show unassigned transactions
+                    ).toList();
+              
+              // Calculate spent and earned amounts from transactions only
+              // Note: Task rewards are automatically added as + transactions when tasks are completed
+              int spent = 0;
+              int earned = 0;
+              
+              for (final tx in transactions) {
+                final amountStr = tx['amount']?.toString() ?? '0';
+                final amount = _parseAmount(amountStr);
+                
+                if (amountStr.startsWith('+')) {
+                  earned += amount; // Task rewards and other earnings
+                } else {
+                  spent += amount; // Regular spending
+                }
+              }
+              
               final initial = 500;
-              final userBalance = initial + completedRewards - spent;
+              final userBalance = initial + earned - spent;
               return Column(
                 children: [
                   Container(
                     width: double.infinity,
                     color: const Color(0xFFF0F0F0),
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'User Balance: ₱$userBalance',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.green,
-                      ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Managing: ${selectedUserName ?? 'Unknown User'}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: TextButton(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+                                  );
+                                  if (result != null) {
+                                    setState(() {
+                                      selectedUserId = result['id'];
+                                      selectedUserName = result['name'];
+                                    });
+                                  }
+                                },
+                                child: const Text('Switch User'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'User Balance: ₱$userBalance',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: userBalance >= 0 ? Colors.green : Colors.red,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Starting: ₱$initial | Earned: ₱$earned | Spent: ₱$spent',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -132,7 +272,7 @@ class AdminScreen extends StatelessWidget {
                                     behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                                     child: ListView(
                                       children: [
-                                        ...tasks.map((task) => _buildTaskTile(context, task)).toList(),
+                                        ...tasks.map((task) => _buildTaskTile(context, task)),
                                         const SizedBox(height: 24),
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -276,6 +416,61 @@ class AdminScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildUserSelectionScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.people,
+            size: 80,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Select a User to Manage',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Click the user icon in the top right to manage users\nand select one to view their tasks.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+              );
+              if (result != null) {
+                setState(() {
+                  selectedUserId = result['id'];
+                  selectedUserName = result['name'];
+                });
+              }
+            },
+            icon: const Icon(Icons.people),
+            label: const Text('Manage Users'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showCreateTaskSheet(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descController = TextEditingController();
@@ -330,17 +525,19 @@ class AdminScreen extends StatelessWidget {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                     onPressed: () async {
+                      final navigator = Navigator.of(context);
                       final name = nameController.text.trim();
                       final desc = descController.text.trim();
                       final reward = rewardController.text.trim();
-                      if (name.isNotEmpty && desc.isNotEmpty && reward.isNotEmpty) {
+                      if (name.isNotEmpty && desc.isNotEmpty && reward.isNotEmpty && selectedUserId != null) {
                         await FirebaseFirestore.instance.collection('tasks').add({
                           'title': name,
                           'reward': '+₱$reward',
                           'description': desc,
                           'completed': false,
+                          'userId': selectedUserId,
                         });
-                        Navigator.pop(context);
+                        navigator.pop();
                       }
                     },
                     child: const Text('Add'),
@@ -351,6 +548,31 @@ class AdminScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.popUntil(context, (route) => route.isFirst);
+              }
+            },
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -434,9 +656,21 @@ class AdminScreen extends StatelessWidget {
             tx.name,
             style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87),
           ),
+          subtitle: tx.type == 'task_reward' 
+              ? const Text(
+                  'Task Reward',
+                  style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                )
+              : null,
           trailing: Text(
-            '-₱${tx.amount}',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
+            tx.amount.startsWith('+') 
+                ? '+₱${tx.amount.substring(1)}' // Keep the + for rewards
+                : '-₱${tx.amount}', // Add - for spending
+            style: TextStyle(
+              fontWeight: FontWeight.bold, 
+              fontSize: 16, 
+              color: tx.amount.startsWith('+') ? Colors.green : Colors.red,
+            ),
           ),
         ),
       ),
@@ -449,8 +683,10 @@ class _Task {
   final String title;
   final String reward;
   final String description;
+  final String? userId;
   final bool completed;
-  _Task(this.id, this.title, this.reward, this.description, this.completed);
+  
+  _Task(this.id, this.title, this.reward, this.description, this.completed, this.userId);
 
   factory _Task.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -460,6 +696,7 @@ class _Task {
       data['reward'] ?? '',
       data['description'] ?? '',
       data['completed'] ?? false,
+      data['userId'], // This will be null for old tasks
     );
   }
 }
@@ -469,7 +706,9 @@ class _Transaction {
   final String name;
   final String amount;
   final DateTime? timestamp;
-  _Transaction(this.id, this.name, this.amount, this.timestamp);
+  final String? type;
+  
+  _Transaction(this.id, this.name, this.amount, this.timestamp, this.type);
 
   factory _Transaction.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -478,6 +717,7 @@ class _Transaction {
       data['name'] ?? '',
       data['amount'] ?? '',
       (data['timestamp'] as Timestamp?)?.toDate(),
+      data['type'], // This will be null for old transactions
     );
   }
 }
