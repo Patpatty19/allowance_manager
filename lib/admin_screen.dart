@@ -1,26 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Mock user balance and tasks (replace with real data/state management as needed)
-    final int userBalance = 500;
-    final List<_Task> tasks = [
-      _Task('Clean the dishes', '+₱20', 'Wash all plates, glasses, and utensils after dinner.', false),
-      _Task('Take out the trash', '+₱15', 'Bring all household trash to the outside bin.', true),
-      _Task('Water the plants', '+₱10', 'Water all indoor and outdoor plants.', false),
-      _Task('Sweep the floor', '+₱25', 'Sweep all rooms and hallways.', true),
-      _Task('Feed the pets', '+₱30', 'Feed the pets in the morning and evening.', false),
-      // ...add more tasks as needed
-    ];
-    final List<_Transaction> transactions = [
-      _Transaction('Bought snacks', '50'),
-      _Transaction('School supplies', '120'),
-      _Transaction('Game top-up', '200'),
-      // ...add more transactions as needed
-    ];
+    final ValueNotifier<String> taskSortOrder = ValueNotifier<String>('latest');
+    final ValueNotifier<String> sortOrder = ValueNotifier<String>('desc');
+
+    int _parseReward(String reward) {
+      return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
+    }
+    int _parseAmount(String amount) {
+      return int.tryParse(RegExp(r'\d+').stringMatch(amount) ?? '0') ?? 0;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -34,66 +28,188 @@ class AdminScreen extends StatelessWidget {
         backgroundColor: Colors.green,
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            color: const Color(0xFFF0F0F0),
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              'User Balance: ₱$userBalance',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              color: const Color(0xFFE8E8E8),
-              padding: const EdgeInsets.only(top: 8, left: 16, right: 16), // Added top padding
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+        builder: (context, taskSnapshot) {
+          if (taskSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (taskSnapshot.hasError) {
+            return Center(child: Text('Error: \\${taskSnapshot.error}'));
+          }
+          final tasks = taskSnapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
+          final completedRewards = tasks.where((t) => t.completed).fold<int>(0, (sum, t) => sum + _parseReward(t.reward));
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('transactions').snapshots(),
+            builder: (context, txSnapshot) {
+              if (txSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (txSnapshot.hasError) {
+                return Center(child: Text('Error: \\${txSnapshot.error}'));
+              }
+              final transactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+              final spent = transactions.fold<int>(0, (sum, tx) => sum + _parseAmount(tx['amount']?.toString() ?? '0'));
+              final initial = 500;
+              final userBalance = initial + completedRewards - spent;
+              return Column(
                 children: [
-                  const Text(
-                    'User Tasks:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.black87,
+                  Container(
+                    width: double.infinity,
+                    color: const Color(0xFFF0F0F0),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'User Balance: ₱$userBalance',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   Expanded(
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                      child: ListView(
+                    child: Container(
+                      width: double.infinity,
+                      color: const Color(0xFFE8E8E8),
+                      padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ...tasks.map((task) => _buildTaskTile(task)).toList(),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'User Transactions:',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Colors.black87,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'User Tasks:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              ValueListenableBuilder<String>(
+                                valueListenable: taskSortOrder,
+                                builder: (context, value, _) => DropdownButton<String>(
+                                  value: value,
+                                  dropdownColor: Colors.green[100],
+                                  underline: Container(),
+                                  icon: const Icon(Icons.filter_alt, color: Colors.green),
+                                  items: const [
+                                    DropdownMenuItem(value: 'latest', child: Text('Latest')),
+                                    DropdownMenuItem(value: 'desc', child: Text('High - Low')),
+                                    DropdownMenuItem(value: 'asc', child: Text('Low - High')),
+                                  ],
+                                  onChanged: (v) {
+                                    if (v != null) taskSortOrder.value = v;
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
-                          ...transactions.map((tx) => _buildTransactionTile(tx)).toList(),
+                          Expanded(
+                            child: ValueListenableBuilder<String>(
+                              valueListenable: taskSortOrder,
+                              builder: (context, taskSort, _) => StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Center(child: Text('Error: \\${snapshot.error}'));
+                                  }
+                                  var tasks = snapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
+                                  if (taskSort == 'asc') {
+                                    tasks.sort((a, b) => _parseReward(a.reward).compareTo(_parseReward(b.reward)));
+                                  } else if (taskSort == 'desc') {
+                                    tasks.sort((a, b) => _parseReward(b.reward).compareTo(_parseReward(a.reward)));
+                                  } else {
+                                    // latest: no sort, or sort by Firestore doc id (not ideal, but keeps order)
+                                  }
+                                  return ScrollConfiguration(
+                                    behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                                    child: ListView(
+                                      children: [
+                                        ...tasks.map((task) => _buildTaskTile(context, task)).toList(),
+                                        const SizedBox(height: 24),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'User Transactions:',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 18,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                            ValueListenableBuilder<String>(
+                                              valueListenable: sortOrder,
+                                              builder: (context, value, _) => DropdownButton<String>(
+                                                value: value,
+                                                dropdownColor: Colors.green[100],
+                                                underline: Container(),
+                                                icon: const Icon(Icons.sort, color: Colors.green),
+                                                items: const [
+                                                  DropdownMenuItem(value: 'desc', child: Text('Price High-Low')),
+                                                  DropdownMenuItem(value: 'asc', child: Text('Price Low-High')),
+                                                  DropdownMenuItem(value: 'latest', child: Text('Latest')),
+                                                ],
+                                                onChanged: (v) {
+                                                  if (v != null) sortOrder.value = v;
+                                                },
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // Firestore transactions StreamBuilder
+                                        ValueListenableBuilder<String>(
+                                          valueListenable: sortOrder,
+                                          builder: (context, value, _) => StreamBuilder<QuerySnapshot>(
+                                            stream: FirebaseFirestore.instance.collection('transactions').orderBy('timestamp', descending: true).snapshots(),
+                                            builder: (context, txSnapshot) {
+                                              if (txSnapshot.connectionState == ConnectionState.waiting) {
+                                                return const Center(child: CircularProgressIndicator());
+                                              }
+                                              if (txSnapshot.hasError) {
+                                                return Center(child: Text('Error: \\${txSnapshot.error}'));
+                                              }
+                                              var transactions = txSnapshot.data?.docs.map((doc) => _Transaction.fromFirestore(doc)).toList() ?? [];
+                                              if (value == 'asc') {
+                                                transactions.sort((a, b) => (int.tryParse(a.amount) ?? 0).compareTo(int.tryParse(b.amount) ?? 0));
+                                              } else if (value == 'desc') {
+                                                transactions.sort((a, b) => (int.tryParse(b.amount) ?? 0).compareTo(int.tryParse(a.amount) ?? 0));
+                                              } else {
+                                                transactions.sort((a, b) => (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)));
+                                              }
+                                              if (transactions.isEmpty) {
+                                                return const Center(child: Text('No transactions yet.'));
+                                              }
+                                              return Column(
+                                                children: transactions.map((tx) => _buildTransactionTile(tx)).toList(),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-        ],
+              );
+            },
+          );
+        },
       ),
       bottomNavigationBar: Container(
         color: Colors.green,
@@ -106,7 +222,7 @@ class AdminScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 IconButton(
-                  onPressed: () {}, // TODO: Implement Home navigation for Admin
+                  onPressed: () {},
                   icon: const Icon(Icons.home),
                   color: Colors.white,
                   iconSize: 36,
@@ -123,7 +239,7 @@ class AdminScreen extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: () {
-                    _showCreateTaskSheet(context, tasks);
+                    _showCreateTaskSheet(context);
                   },
                   icon: const Icon(Icons.add_task),
                   color: Colors.white,
@@ -160,7 +276,7 @@ class AdminScreen extends StatelessWidget {
     );
   }
 
-  void _showCreateTaskSheet(BuildContext context, List<_Task> tasks) {
+  void _showCreateTaskSheet(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController descController = TextEditingController();
     final TextEditingController rewardController = TextEditingController();
@@ -213,12 +329,17 @@ class AdminScreen extends StatelessWidget {
                   const SizedBox(width: 12),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    onPressed: () {
+                    onPressed: () async {
                       final name = nameController.text.trim();
                       final desc = descController.text.trim();
                       final reward = rewardController.text.trim();
                       if (name.isNotEmpty && desc.isNotEmpty && reward.isNotEmpty) {
-                        tasks.add(_Task(name, '+₱$reward', desc, false));
+                        await FirebaseFirestore.instance.collection('tasks').add({
+                          'title': name,
+                          'reward': '+₱$reward',
+                          'description': desc,
+                          'completed': false,
+                        });
                         Navigator.pop(context);
                       }
                     },
@@ -233,7 +354,7 @@ class AdminScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTaskTile(_Task task) {
+  Widget _buildTaskTile(BuildContext context, _Task task) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: ListTile(
@@ -245,7 +366,9 @@ class AdminScreen extends StatelessWidget {
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(task.title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87)),
+            Expanded(
+              child: Text(task.title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87)),
+            ),
             Text(task.reward, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
             if (task.completed)
               const Padding(
@@ -257,6 +380,32 @@ class AdminScreen extends StatelessWidget {
                 padding: EdgeInsets.only(left: 8.0),
                 child: Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 20),
               ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+              tooltip: 'Delete Task',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Task'),
+                    content: const Text('Are you sure you want to delete this task?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await FirebaseFirestore.instance.collection('tasks').doc(task.id).delete();
+                }
+              },
+            ),
           ],
         ),
         subtitle: Text(task.description, style: const TextStyle(fontSize: 15, color: Colors.black54)),
@@ -296,15 +445,39 @@ class AdminScreen extends StatelessWidget {
 }
 
 class _Task {
+  final String id;
   final String title;
   final String reward;
   final String description;
   final bool completed;
-  _Task(this.title, this.reward, this.description, this.completed);
+  _Task(this.id, this.title, this.reward, this.description, this.completed);
+
+  factory _Task.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return _Task(
+      doc.id,
+      data['title'] ?? '',
+      data['reward'] ?? '',
+      data['description'] ?? '',
+      data['completed'] ?? false,
+    );
+  }
 }
 
 class _Transaction {
+  final String id;
   final String name;
   final String amount;
-  _Transaction(this.name, this.amount);
+  final DateTime? timestamp;
+  _Transaction(this.id, this.name, this.amount, this.timestamp);
+
+  factory _Transaction.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return _Transaction(
+      doc.id,
+      data['name'] ?? '',
+      data['amount'] ?? '',
+      (data['timestamp'] as Timestamp?)?.toDate(),
+    );
+  }
 }
