@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'user_screen.dart';
-import 'admin_screen.dart';
+import 'admin_login.dart'; // Changed this line
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
@@ -40,7 +40,7 @@ class MainMenuScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const AdminScreen()),
+                  MaterialPageRoute(builder: (context) => const AdminLogin()), // Changed this line
                 );
               },
               child: const Text('Admin'),
