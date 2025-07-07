@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserTransactionHistoryScreen extends StatefulWidget {
   const UserTransactionHistoryScreen({super.key});
@@ -9,7 +10,7 @@ class UserTransactionHistoryScreen extends StatefulWidget {
 }
 
 class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScreen> {
-  final List<_Transaction> _transactions = [];
+  String _sortOrder = 'latest'; // 'asc', 'desc', or 'latest'
 
   void _showAddTransactionSheet(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
@@ -58,12 +59,14 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                   const SizedBox(width: 12),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    onPressed: () {
+                    onPressed: () async {
                       final name = nameController.text.trim();
                       final amount = amountController.text.trim();
                       if (name.isNotEmpty && amount.isNotEmpty) {
-                        setState(() {
-                          _transactions.add(_Transaction(name, amount));
+                        await FirebaseFirestore.instance.collection('transactions').add({
+                          'name': name,
+                          'amount': amount,
+                          'timestamp': FieldValue.serverTimestamp(),
                         });
                         Navigator.pop(context);
                       }
@@ -92,47 +95,118 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
         ),
         backgroundColor: Colors.green,
         automaticallyImplyLeading: false,
+        actions: [
+          DropdownButton<String>(
+            value: _sortOrder,
+            dropdownColor: Colors.green[100],
+            underline: Container(),
+            icon: const Icon(Icons.sort, color: Colors.white),
+            items: const [
+              DropdownMenuItem(value: 'latest', child: Text('Latest')),
+              DropdownMenuItem(value: 'desc', child: Text('Price High-Low')),
+              DropdownMenuItem(value: 'asc', child: Text('Price Low-High')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _sortOrder = value;
+                });
+              }
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
-          _transactions.isEmpty
-              ? const Center(child: Text('No transactions yet.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                  itemCount: _transactions.length,
-                  itemBuilder: (context, index) {
-                    final tx = _transactions[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('transactions').orderBy('timestamp', descending: true).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: \\${snapshot.error}'));
+              }
+              var transactions = snapshot.data?.docs.map((doc) => _Transaction.fromFirestore(doc)).toList() ?? [];
+              if (_sortOrder == 'asc') {
+                transactions.sort((a, b) => (int.tryParse(a.amount) ?? 0).compareTo(int.tryParse(b.amount) ?? 0));
+              } else if (_sortOrder == 'desc') {
+                transactions.sort((a, b) => (int.tryParse(b.amount) ?? 0).compareTo(int.tryParse(a.amount) ?? 0));
+              } else {
+                transactions.sort((a, b) => (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)));
+              }
+              if (transactions.isEmpty) {
+                return const Center(child: Text('No transactions yet.'));
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                itemCount: transactions.length,
+                itemBuilder: (context, index) {
+                  final tx = transactions[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        title: Text(
+                          tx.name,
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '-₱${tx.amount}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red, size: 22),
+                              tooltip: 'Delete Transaction',
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Transaction'),
+                                    content: const Text('Are you sure you want to delete this transaction?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  await FirebaseFirestore.instance.collection('transactions').doc(tx.id).delete();
+                                }
+                              },
                             ),
                           ],
                         ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          title: Text(
-                            tx.name,
-                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87),
-                          ),
-                          trailing: Text(
-                            '-₱${tx.amount}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red),
-                          ),
-                        ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
           Positioned(
-            bottom: 8, // Now almost touching the bottom navbar
+            bottom: 8,
             right: 24,
             child: FloatingActionButton(
               backgroundColor: Colors.green,
@@ -212,7 +286,24 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
 }
 
 class _Transaction {
+  final String id;
   final String name;
   final String amount;
-  _Transaction(this.name, this.amount);
+  final DateTime? timestamp;
+  _Transaction(this.id, this.name, this.amount, this.timestamp);
+
+  factory _Transaction.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return _Transaction(
+      doc.id,
+      data['name'] ?? '',
+      data['amount'] ?? '',
+      (data['timestamp'] as Timestamp?)?.toDate(),
+    );
+  }
+}
+
+// Helper to parse reward string to int
+int _parseReward(String reward) {
+  return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
 }

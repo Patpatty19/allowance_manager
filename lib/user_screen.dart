@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_transaction_history.dart';
 
 class UserScreen extends StatefulWidget {
@@ -9,22 +10,13 @@ class UserScreen extends StatefulWidget {
 }
 
 class _UserScreenState extends State<UserScreen> {
-  final List<_Task> _tasks = [
-    _Task('Clean the dishes', '+₱20', 'Wash all plates, glasses, and utensils after dinner.'),
-    _Task('Take out the trash', '+₱15', 'Bring all household trash to the outside bin.'),
-    _Task('Water the plants', '+₱10', 'Water all indoor and outdoor plants.'),
-    _Task('Sweep the floor', '+₱25', 'Sweep all rooms and hallways.'),
-    _Task('Feed the pets', '+₱30', 'Feed the pets in the morning and evening.'),
-    _Task('Organize books', '+₱18', 'Arrange all books on the shelves neatly.'),
-    _Task('Wipe the table', '+₱12', 'Wipe down the dining and coffee tables.'),
-    _Task('Help with groceries', '+₱40', 'Assist in carrying and putting away groceries.'),
-    _Task('Fold laundry', '+₱22', 'Fold all clean laundry and put them away.'),
-    _Task('Set the table', '+₱14', 'Set the table before meals.'),
-    _Task('Water garden', '+₱16', 'Water the garden plants in the morning.'),
-    _Task('Dust shelves', '+₱19', 'Dust all shelves in the living room and bedrooms.'),
-    _Task('Pack school bag', '+₱11', 'Pack books and supplies for school.'),
-    _Task('Refill water bottles', '+₱13', 'Refill all water bottles for the family.'),
-  ];
+  int _parseReward(String reward) {
+    return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
+  }
+
+  int _parseAmount(String amount) {
+    return int.tryParse(RegExp(r'\d+').stringMatch(amount) ?? '0') ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,120 +32,154 @@ class _UserScreenState extends State<UserScreen> {
         backgroundColor: Colors.green,
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            color: Color(0xFFF0F0F0), // light grey background
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: const Text(
-              'Balance: ₱500',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              color: Color(0xFFE8E8E8), // slightly darker grey
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
+        builder: (context, taskSnapshot) {
+          if (taskSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (taskSnapshot.hasError) {
+            return Center(child: Text('Error: \\${taskSnapshot.error}'));
+          }
+          final tasks = taskSnapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
+          final completedRewards = tasks.where((t) => t.completed).fold<int>(0, (sum, t) => sum + _parseReward(t.reward));
+
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('transactions').snapshots(),
+            builder: (context, txSnapshot) {
+              if (txSnapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (txSnapshot.hasError) {
+                return Center(child: Text('Error: \\${txSnapshot.error}'));
+              }
+              final transactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+              final spent = transactions.fold<int>(0, (sum, tx) => sum + _parseAmount(tx['amount']?.toString() ?? '0'));
+              final initial = 500;
+              final balance = initial + completedRewards - spent;
+
+              return Column(
                 children: [
-                  const Text(
-                    'To Do:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.black87,
+                  Container(
+                    width: double.infinity,
+                    color: Color(0xFFF0F0F0),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Balance: ₱$balance',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   Expanded(
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                      child: ListView(
-                        children: _tasks.map((task) => _buildTaskTile(task)).toList(),
+                    child: Container(
+                      width: double.infinity,
+                      color: Color(0xFFE8E8E8),
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'To Do:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Expanded(
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: ListView(
+                                children: tasks.map((task) => _buildTaskTile(task)).toList(),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                  Container(
+                    color: Colors.green,
+                    height: 80,
+                    width: double.infinity,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              onPressed: () {},
+                              icon: const Icon(Icons.home),
+                              color: Colors.white,
+                              iconSize: 36,
+                              tooltip: 'Home',
+                            ),
+                            const Text(
+                              'Home',
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const UserTransactionHistoryScreen(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.receipt_long),
+                              color: Colors.white,
+                              iconSize: 36,
+                              tooltip: 'Transactions',
+                            ),
+                            const Text(
+                              'Transactions',
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              onPressed: () {
+                                Navigator.popUntil(context, (route) => route.isFirst);
+                              },
+                              icon: const Icon(Icons.exit_to_app),
+                              color: Colors.white,
+                              iconSize: 36,
+                              tooltip: 'Exit',
+                            ),
+                            const Text(
+                              'Exit',
+                              style: TextStyle(color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            ),
-          ),
-          Container(
-            color: Colors.green,
-            height: 80,
-            width: double.infinity,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.home),
-                      color: Colors.white,
-                      iconSize: 36,
-                      tooltip: 'Home',
-                    ),
-                    const Text(
-                      'Home',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ],
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const UserTransactionHistoryScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.receipt_long),
-                      color: Colors.white,
-                      iconSize: 36,
-                      tooltip: 'Transactions',
-                    ),
-                    const Text(
-                      'Transactions',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ],
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        Navigator.popUntil(context, (route) => route.isFirst);
-                      },
-                      icon: const Icon(Icons.exit_to_app),
-                      color: Colors.white,
-                      iconSize: 36,
-                      tooltip: 'Exit',
-                    ),
-                    const Text(
-                      'Exit',
-                      style: TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -196,7 +222,7 @@ class _UserScreenState extends State<UserScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 8), // Added padding above description
+                      const SizedBox(height: 8),
                       Text(task.description, style: const TextStyle(fontSize: 15, color: Colors.black54)),
                     ],
                   ),
@@ -204,10 +230,8 @@ class _UserScreenState extends State<UserScreen> {
                 const SizedBox(width: 8),
                 if (!task.completed)
                   ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        task.completed = true;
-                      });
+                    onPressed: () async {
+                      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': true});
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
@@ -218,10 +242,8 @@ class _UserScreenState extends State<UserScreen> {
                   )
                 else
                   ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        task.completed = false;
-                      });
+                    onPressed: () async {
+                      await FirebaseFirestore.instance.collection('tasks').doc(task.id).update({'completed': false});
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey,
@@ -240,9 +262,21 @@ class _UserScreenState extends State<UserScreen> {
 }
 
 class _Task {
+  final String id;
   final String title;
   final String reward;
   final String description;
-  bool completed = false;
-  _Task(this.title, this.reward, this.description);
+  bool completed;
+  _Task(this.id, this.title, this.reward, this.description, this.completed);
+
+  factory _Task.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return _Task(
+      doc.id,
+      data['title'] ?? '',
+      data['reward'] ?? '',
+      data['description'] ?? '',
+      data['completed'] ?? false,
+    );
+  }
 }
