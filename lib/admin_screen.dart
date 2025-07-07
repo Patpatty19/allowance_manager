@@ -30,14 +30,15 @@ class _AdminScreenState extends State<AdminScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Welcome Admin!',
+          'Admin Dashboard',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: const Color(0xFF929982),
         automaticallyImplyLeading: false,
+        elevation: 3,
         actions: [
           IconButton(
             icon: const Icon(Icons.people, color: Colors.white),
@@ -72,7 +73,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 value: 'change_password',
                 child: Row(
                   children: [
-                    Icon(Icons.lock_outline, color: Colors.grey),
+                    Icon(Icons.lock_outline, color: Color(0xFF7A918D)),
                     SizedBox(width: 8),
                     Text('Change Password'),
                   ],
@@ -82,7 +83,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 value: 'logout',
                 child: Row(
                   children: [
-                    Icon(Icons.logout, color: Colors.grey),
+                    Icon(Icons.logout, color: Color(0xFF7A918D)),
                     SizedBox(width: 8),
                     Text('Logout'),
                   ],
@@ -149,52 +150,99 @@ class _AdminScreenState extends State<AdminScreen> {
                 children: [
                   Container(
                     width: double.infinity,
-                    color: const Color(0xFFF0F0F0),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFDBFEB8), Color(0xFFC5EDAC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Text(
-                                  'Managing: ${selectedUserName ?? 'Unknown User'}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black87,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Managing User:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: const Color(0xFF7A918D),
+                                    ),
                                   ),
-                                ),
+                                  Text(
+                                    selectedUserName ?? 'Unknown User',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2E3440),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 16),
-                              child: TextButton(
-                                onPressed: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const UserManagementScreen()),
-                                  );
-                                  if (result != null) {
-                                    setState(() {
-                                      selectedUserId = result['id'];
-                                      selectedUserName = result['name'];
-                                    });
-                                  }
-                                },
-                                child: const Text('Switch User'),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+                                );
+                                if (result != null) {
+                                  setState(() {
+                                    selectedUserId = result['id'];
+                                    selectedUserName = result['name'];
+                                  });
+                                }
+                              },
+                              icon: const Icon(Icons.swap_horiz, size: 18),
+                              label: const Text('Switch User'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF93B1A7),
+                                foregroundColor: Colors.white,
+                                elevation: 2,
                               ),
                             ),
                           ],
                         ),
-                        Text(
-                          'User Balance: ₱$userBalance',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: userBalance >= 0 ? Colors.green : Colors.red,
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                'Current Balance',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF7A918D),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '₱$userBalance',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: userBalance >= 0 ? const Color(0xFF7A918D) : const Color(0xFFE57373),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -212,42 +260,98 @@ class _AdminScreenState extends State<AdminScreen> {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      color: const Color(0xFFE8E8E8),
-                      padding: const EdgeInsets.only(top: 8, left: 16, right: 16),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFF8FDF5), Color(0xFFF0F8EA)],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'User Tasks:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.black87,
-                                ),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFE8F5E8), Color(0xFFD4F1D4)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                              ValueListenableBuilder<String>(
-                                valueListenable: taskSortOrder,
-                                builder: (context, value, _) => DropdownButton<String>(
-                                  value: value,
-                                  dropdownColor: Colors.green[100],
-                                  underline: Container(),
-                                  icon: const Icon(Icons.filter_alt, color: Colors.green),
-                                  items: const [
-                                    DropdownMenuItem(value: 'latest', child: Text('Latest')),
-                                    DropdownMenuItem(value: 'desc', child: Text('High - Low')),
-                                    DropdownMenuItem(value: 'asc', child: Text('Low - High')),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF929982).withOpacity(0.1),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF929982),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.assignment_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Tasks & Activities',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20,
+                                        color: Color(0xFF2E3440),
+                                      ),
+                                    ),
                                   ],
-                                  onChanged: (v) {
-                                    if (v != null) taskSortOrder.value = v;
-                                  },
                                 ),
-                              ),
-                            ],
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ValueListenableBuilder<String>(
+                                    valueListenable: taskSortOrder,
+                                    builder: (context, value, _) => DropdownButton<String>(
+                                      value: value,
+                                      dropdownColor: const Color(0xFFF8F9FA),
+                                      underline: Container(),
+                                      icon: const Icon(Icons.filter_alt, color: Color(0xFF929982), size: 20),
+                                      items: const [
+                                        DropdownMenuItem(value: 'latest', child: Text('Latest')),
+                                        DropdownMenuItem(value: 'desc', child: Text('High - Low')),
+                                        DropdownMenuItem(value: 'asc', child: Text('Low - High')),
+                                      ],
+                                      onChanged: (v) {
+                                        if (v != null) taskSortOrder.value = v;
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 16),
                           Expanded(
                             child: ValueListenableBuilder<String>(
                               valueListenable: taskSortOrder,
@@ -255,10 +359,14 @@ class _AdminScreenState extends State<AdminScreen> {
                                 stream: FirebaseFirestore.instance.collection('tasks').snapshots(),
                                 builder: (context, snapshot) {
                                   if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Center(child: CircularProgressIndicator());
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF929982)),
+                                      ),
+                                    );
                                   }
                                   if (snapshot.hasError) {
-                                    return Center(child: Text('Error: \\${snapshot.error}'));
+                                    return Center(child: Text('Error: ${snapshot.error}'));
                                   }
                                   var tasks = snapshot.data?.docs.map((doc) => _Task.fromFirestore(doc)).toList() ?? [];
                                   if (taskSort == 'asc') {
@@ -273,38 +381,88 @@ class _AdminScreenState extends State<AdminScreen> {
                                     child: ListView(
                                       children: [
                                         ...tasks.map((task) => _buildTaskTile(context, task)),
-                                        const SizedBox(height: 24),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'User Transactions:',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 18,
-                                                color: Colors.black87,
-                                              ),
+                                        const SizedBox(height: 32),
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            gradient: const LinearGradient(
+                                              colors: [Color(0xFFE8F5E8), Color(0xFFD4F1D4)],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
                                             ),
-                                            ValueListenableBuilder<String>(
-                                              valueListenable: sortOrder,
-                                              builder: (context, value, _) => DropdownButton<String>(
-                                                value: value,
-                                                dropdownColor: Colors.green[100],
-                                                underline: Container(),
-                                                icon: const Icon(Icons.sort, color: Colors.green),
-                                                items: const [
-                                                  DropdownMenuItem(value: 'desc', child: Text('Price High-Low')),
-                                                  DropdownMenuItem(value: 'asc', child: Text('Price Low-High')),
-                                                  DropdownMenuItem(value: 'latest', child: Text('Latest')),
+                                            borderRadius: BorderRadius.circular(16),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF929982).withOpacity(0.1),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 4),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    width: 40,
+                                                    height: 40,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF929982),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.history_rounded,
+                                                      color: Colors.white,
+                                                      size: 24,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  const Text(
+                                                    'Transaction History',
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 20,
+                                                      color: Color(0xFF2E3440),
+                                                    ),
+                                                  ),
                                                 ],
-                                                onChanged: (v) {
-                                                  if (v != null) sortOrder.value = v;
-                                                },
                                               ),
-                                            ),
-                                          ],
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black.withOpacity(0.1),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: ValueListenableBuilder<String>(
+                                                  valueListenable: sortOrder,
+                                                  builder: (context, value, _) => DropdownButton<String>(
+                                                    value: value,
+                                                    dropdownColor: const Color(0xFFF8F9FA),
+                                                    underline: Container(),
+                                                    icon: const Icon(Icons.sort, color: Color(0xFF929982), size: 20),
+                                                    items: const [
+                                                      DropdownMenuItem(value: 'desc', child: Text('Price High-Low')),
+                                                      DropdownMenuItem(value: 'asc', child: Text('Price Low-High')),
+                                                      DropdownMenuItem(value: 'latest', child: Text('Latest')),
+                                                    ],
+                                                    onChanged: (v) {
+                                                      if (v != null) sortOrder.value = v;
+                                                    },
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 16),
                                         // Firestore transactions StreamBuilder
                                         ValueListenableBuilder<String>(
                                           valueListenable: sortOrder,
@@ -352,7 +510,13 @@ class _AdminScreenState extends State<AdminScreen> {
         },
       ),
       bottomNavigationBar: Container(
-        color: Colors.green,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF7A918D), Color(0xFF93B1A7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         height: 80,
         width: double.infinity,
         child: Row(
@@ -365,7 +529,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   onPressed: () {},
                   icon: const Icon(Icons.home),
                   color: Colors.white,
-                  iconSize: 36,
+                  iconSize: 32,
                   tooltip: 'Home',
                 ),
                 const Text(
@@ -383,7 +547,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   },
                   icon: const Icon(Icons.add_task),
                   color: Colors.white,
-                  iconSize: 36,
+                  iconSize: 32,
                   tooltip: 'Create Task',
                 ),
                 const Text(
@@ -401,7 +565,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   },
                   icon: const Icon(Icons.exit_to_app),
                   color: Colors.white,
-                  iconSize: 36,
+                  iconSize: 32,
                   tooltip: 'Exit',
                 ),
                 const Text(
@@ -417,56 +581,131 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildUserSelectionScreen() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.people,
-            size: 80,
-            color: Colors.grey,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFDBFEB8),
+            Color(0xFFC5EDAC),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 1000),
+                tween: Tween(begin: 0.0, end: 1.0),
+                builder: (context, value, child) {
+                  return Transform.scale(
+                    scale: value,
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF929982),
+                            const Color(0xFF7A916E),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF929982).withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.people_rounded,
+                        size: 80,
+                        color: Colors.white,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Choose a Family Member',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2E3440),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Select someone to manage their tasks and allowance',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF7A918D),
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const Text(
+                'Choose a user to view their tasks, balance,\nand manage their allowance activities.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF929982),
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 48),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+                    );
+                    if (result != null) {
+                      setState(() {
+                        selectedUserId = result['id'];
+                        selectedUserName = result['name'];
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.people, size: 24),
+                  label: const Text(
+                    'Manage Users',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF929982),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    minimumSize: const Size(200, 56),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'Select a User to Manage',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Click the user icon in the top right to manage users\nand select one to view their tasks.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const UserManagementScreen()),
-              );
-              if (result != null) {
-                setState(() {
-                  selectedUserId = result['id'];
-                  selectedUserName = result['name'];
-                });
-              }
-            },
-            icon: const Icon(Icons.people),
-            label: const Text('Manage Users'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -480,28 +719,60 @@ class _AdminScreenState extends State<AdminScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      backgroundColor: Colors.white,
       builder: (context) {
-        return Padding(
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Create Task', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF7A918D),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_task,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Create New Task',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2E3440),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
                   labelText: 'Task Name',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.task, color: Color(0xFF7A918D)),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: descController,
+                maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Description',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description, color: Color(0xFF7A918D)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -511,19 +782,27 @@ class _AdminScreenState extends State<AdminScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Reward (PHP)',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.monetization_on, color: Color(0xFF7A918D)),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Color(0xFF7A918D)),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF929982),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
                     onPressed: () async {
                       final navigator = Navigator.of(context);
                       final name = nameController.text.trim();
@@ -540,7 +819,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         navigator.pop();
                       }
                     },
-                    child: const Text('Add'),
+                    child: const Text('Create Task'),
                   ),
                 ],
               ),
@@ -578,101 +857,353 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildTaskTile(BuildContext context, _Task task) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: ListTile(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        tileColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(task.title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87)),
-            ),
-            Text(task.reward, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
-            if (task.completed)
-              const Padding(
-                padding: EdgeInsets.only(left: 8.0),
-                child: Icon(Icons.check_circle, color: Colors.green, size: 20),
-              )
-            else
-              const Padding(
-                padding: EdgeInsets.only(left: 8.0),
-                child: Icon(Icons.radio_button_unchecked, color: Colors.grey, size: 20),
-              ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red, size: 22),
-              tooltip: 'Delete Task',
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Delete Task'),
-                    content: const Text('Are you sure you want to delete this task?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 500),
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: 0.95 + (0.05 * value),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    const Color(0xFFF8FDF5),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                    spreadRadius: 1,
                   ),
-                );
-                if (confirm == true) {
-                  await FirebaseFirestore.instance.collection('tasks').doc(task.id).delete();
-                }
-              },
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    // Task status indicator
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: task.completed
+                              ? [const Color(0xFF99C2A2), const Color(0xFF7A916E)]
+                              : [const Color(0xFF929982), const Color(0xFF7A916E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF929982).withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        task.completed ? Icons.check_circle_rounded : Icons.assignment_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Task content
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            task.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: task.completed 
+                                  ? const Color(0xFF7A918D)
+                                  : const Color(0xFF2E3440),
+                              decoration: task.completed 
+                                  ? TextDecoration.lineThrough 
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            task.description,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              height: 1.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Reward display
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF929982),
+                            const Color(0xFF7A916E),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF929982).withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.stars_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            task.reward,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Delete button
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.delete_rounded,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        tooltip: 'Delete Task',
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text(
+                                'Delete Task',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2E3440),
+                                ),
+                              ),
+                              content: const Text(
+                                'Are you sure you want to delete this task? This action cannot be undone.',
+                                style: TextStyle(height: 1.4),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(color: Color(0xFF7A918D)),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await FirebaseFirestore.instance.collection('tasks').doc(task.id).delete();
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        subtitle: Text(task.description, style: const TextStyle(fontSize: 15, color: Colors.black54)),
+          );
+        },
       ),
     );
   }
 
   Widget _buildTransactionTile(_Transaction tx) {
+    final isPositive = tx.amount.startsWith('+');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 4,
-              offset: Offset(0, 2),
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 400),
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: 0.95 + (0.05 * value),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    isPositive 
+                        ? const Color(0xFFF0F8F0)
+                        : const Color(0xFFFFF8F0),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+                border: Border.all(
+                  color: isPositive 
+                      ? const Color(0xFF99C2A2).withOpacity(0.2)
+                      : const Color(0xFFE57373).withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Transaction type icon
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isPositive
+                              ? [const Color(0xFF99C2A2), const Color(0xFF7A916E)]
+                              : [const Color(0xFFE57373), const Color(0xFFD32F2F)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isPositive 
+                                ? const Color(0xFF99C2A2) 
+                                : const Color(0xFFE57373)).withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isPositive 
+                            ? Icons.add_circle_rounded
+                            : Icons.remove_circle_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Transaction details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tx.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: Color(0xFF2E3440),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (tx.type == 'task_reward')
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF99C2A2).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Task Reward',
+                                style: TextStyle(
+                                  color: Color(0xFF4A5A4A),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          if (tx.timestamp != null)
+                            Text(
+                              '${tx.timestamp!.day}/${tx.timestamp!.month}/${tx.timestamp!.year}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Amount display
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isPositive 
+                            ? const Color(0xFF99C2A2).withOpacity(0.1)
+                            : const Color(0xFFE57373).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isPositive 
+                            ? '+₱${tx.amount.substring(1)}'
+                            : '-₱${tx.amount}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isPositive 
+                              ? const Color(0xFF4A7C59)
+                              : const Color(0xFFD32F2F),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          title: Text(
-            tx.name,
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87),
-          ),
-          subtitle: tx.type == 'task_reward' 
-              ? const Text(
-                  'Task Reward',
-                  style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
-                )
-              : null,
-          trailing: Text(
-            tx.amount.startsWith('+') 
-                ? '+₱${tx.amount.substring(1)}' // Keep the + for rewards
-                : '-₱${tx.amount}', // Add - for spending
-            style: TextStyle(
-              fontWeight: FontWeight.bold, 
-              fontSize: 16, 
-              color: tx.amount.startsWith('+') ? Colors.green : Colors.red,
-            ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

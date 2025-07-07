@@ -22,20 +22,50 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      backgroundColor: Colors.white,
       builder: (context) {
-        return Padding(
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           padding: const EdgeInsets.all(24.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Add Transaction', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF929982),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Add Transaction',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2E3440),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(
                   labelText: 'Transaction Name',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.receipt, color: Color(0xFF929982)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -48,19 +78,27 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                 decoration: const InputDecoration(
                   labelText: 'Amount',
                   border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.monetization_on, color: Color(0xFF929982)),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: Color(0xFF929982)),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF929982),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
                     onPressed: () async {
                       final navigator = Navigator.of(context);
                       final name = nameController.text.trim();
@@ -76,7 +114,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                         navigator.pop();
                       }
                     },
-                    child: const Text('Add'),
+                    child: const Text('Add Transaction'),
                   ),
                 ],
               ),
@@ -98,12 +136,13 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: const Color(0xFF929982),
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
           DropdownButton<String>(
             value: _sortOrder,
-            dropdownColor: Colors.green[100],
+            dropdownColor: const Color(0xFFC5EDAC),
             underline: Container(),
             icon: const Icon(Icons.sort, color: Colors.white),
             items: const [
@@ -176,7 +215,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                         subtitle: tx.type == 'task_reward' 
                             ? const Text(
                                 'Task Reward',
-                                style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                                style: TextStyle(color: Color(0xFF99C2A2), fontSize: 12, fontWeight: FontWeight.w500),
                               )
                             : null,
                         trailing: Row(
@@ -189,7 +228,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                               style: TextStyle(
                                 fontWeight: FontWeight.bold, 
                                 fontSize: 16, 
-                                color: tx.amount.startsWith('+') ? Colors.green : Colors.red,
+                                color: tx.amount.startsWith('+') ? const Color(0xFF99C2A2) : const Color(0xFFE57373),
                               ),
                             ),
                             IconButton(
@@ -231,7 +270,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
             bottom: 8,
             right: 24,
             child: FloatingActionButton(
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFF99C2A2),
               onPressed: () => _showAddTransactionSheet(context),
               tooltip: 'Add Transaction',
               child: const Icon(Icons.add, size: 32, color: Colors.white),
@@ -241,7 +280,13 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
       ),
       bottomNavigationBar: SafeArea(
         child: Container(
-          color: Colors.green,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF929982), Color(0xFF7A918D)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
           height: 80,
           width: double.infinity,
           child: Row(
@@ -256,7 +301,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     },
                     icon: const Icon(Icons.home),
                     color: Colors.white,
-                    iconSize: 36,
+                    iconSize: 32,
                     tooltip: 'Home',
                   ),
                   const Text(
@@ -272,7 +317,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     onPressed: () {},
                     icon: const Icon(Icons.receipt_long),
                     color: Colors.white,
-                    iconSize: 36,
+                    iconSize: 32,
                     tooltip: 'Transactions',
                   ),
                   const Text(

@@ -96,7 +96,7 @@ class _UserScreenState extends State<UserScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: Colors.green,
+        backgroundColor: const Color(0xFF929982),
         automaticallyImplyLeading: false,
       ),
       body: widget.userId == null 
@@ -142,7 +142,6 @@ class _UserScreenState extends State<UserScreen> {
               ).toList();
               
               // Calculate spent and earned amounts from transactions only
-              // Note: Task rewards are automatically added as + transactions when tasks are completed
               int spent = 0;
               int earned = 0;
               
@@ -151,9 +150,9 @@ class _UserScreenState extends State<UserScreen> {
                 final amount = _parseAmount(amountStr);
                 
                 if (amountStr.startsWith('+')) {
-                  earned += amount; // Task rewards and other earnings
+                  earned += amount;
                 } else {
-                  spent += amount; // Regular spending
+                  spent += amount;
                 }
               }
               
@@ -162,39 +161,171 @@ class _UserScreenState extends State<UserScreen> {
 
               return Column(
                 children: [
+                  // Balance Display Section
                   Container(
                     width: double.infinity,
-                    color: Color(0xFFF0F0F0),
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFDBFEB8), Color(0xFFC5EDAC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
                     child: Column(
                       children: [
-                        Text(
-                          'Current Balance: ₱$balance',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: balance >= 0 ? Colors.green : Colors.red,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Starting: ₱$initial | Earned: ₱$earned | Spent: ₱$spent',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
+                        TweenAnimationBuilder<double>(
+                          duration: const Duration(milliseconds: 1200),
+                          tween: Tween(begin: 0.0, end: 1.0),
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: 0.8 + (0.2 * value),
+                              child: Container(
+                                padding: const EdgeInsets.all(28),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white,
+                                      const Color(0xFFF8F9FA),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            const Color(0xFF929982),
+                                            const Color(0xFF7A916E),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.account_balance_wallet_rounded,
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'My Allowance',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF7A918D),
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '₱$balance',
+                                      style: TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold,
+                                        color: balance >= 0 ? const Color(0xFF99C2A2) : const Color(0xFFE57373),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'Starting',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                            Text(
+                                              '₱$initial',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF7A918D),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'Earned',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                            Text(
+                                              '₱$earned',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF99C2A2),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        Column(
+                                          children: [
+                                            Text(
+                                              'Spent',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                            Text(
+                                              '₱$spent',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFFE57373),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  // Tasks Section
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      color: Color(0xFFE8E8E8),
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -219,8 +350,15 @@ class _UserScreenState extends State<UserScreen> {
                       ),
                     ),
                   ),
+                  // Bottom Navigation
                   Container(
-                    color: Colors.green,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF99C2A2), Color(0xFF93B1A7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
                     height: 80,
                     width: double.infinity,
                     child: Row(
@@ -233,7 +371,7 @@ class _UserScreenState extends State<UserScreen> {
                               onPressed: () {},
                               icon: const Icon(Icons.home),
                               color: Colors.white,
-                              iconSize: 36,
+                              iconSize: 32,
                               tooltip: 'Home',
                             ),
                             const Text(
@@ -256,7 +394,7 @@ class _UserScreenState extends State<UserScreen> {
                               },
                               icon: const Icon(Icons.receipt_long),
                               color: Colors.white,
-                              iconSize: 36,
+                              iconSize: 32,
                               tooltip: 'Transactions',
                             ),
                             const Text(
@@ -274,7 +412,7 @@ class _UserScreenState extends State<UserScreen> {
                               },
                               icon: const Icon(Icons.exit_to_app),
                               color: Colors.white,
-                              iconSize: 36,
+                              iconSize: 32,
                               tooltip: 'Exit',
                             ),
                             const Text(
@@ -298,71 +436,186 @@ class _UserScreenState extends State<UserScreen> {
   // Helper widget for task tiles
   Widget _buildTaskTile(_Task task) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: ExpansionTile(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide.none,
-        ),
-        collapsedShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide.none,
-        ),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        backgroundColor: Colors.white,
-        collapsedBackgroundColor: Colors.white,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(task.title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 18, color: Colors.black87)),
-            Text(task.reward, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
-            if (task.completed)
-              const Padding(
-                padding: EdgeInsets.only(left: 8.0),
-                child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 600),
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: 0.9 + (0.1 * value),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white,
+                    const Color(0xFFF8F9FA),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
-          ],
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8, right: 8, bottom: 12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      Text(task.description, style: const TextStyle(fontSize: 15, color: Colors.black54)),
-                    ],
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: task.completed ? null : () => _completeTask(task),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        // Task completion indicator
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: task.completed
+                                  ? [const Color(0xFF99C2A2), const Color(0xFF7A916E)]
+                                  : [Colors.grey[300]!, Colors.grey[400]!],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: task.completed
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF99C2A2).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: task.completed
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                    key: ValueKey('completed'),
+                                  )
+                                : Icon(
+                                    Icons.radio_button_unchecked_rounded,
+                                    color: Colors.grey[600],
+                                    size: 28,
+                                    key: const ValueKey('uncompleted'),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Task content
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                task.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: task.completed 
+                                      ? const Color(0xFF7A918D)
+                                      : const Color(0xFF2E3440),
+                                  decoration: task.completed 
+                                      ? TextDecoration.lineThrough 
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                task.description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.3,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Reward display
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF929982),
+                                const Color(0xFF7A916E),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF929982).withOpacity(0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.stars_rounded,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                task.reward,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (task.completed) ...[
+                          const SizedBox(width: 12),
+                          // Undo button for completed tasks
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              onPressed: () => _uncompleteTask(task),
+                              icon: Icon(
+                                Icons.undo_rounded,
+                                color: Colors.grey[600],
+                                size: 20,
+                              ),
+                              tooltip: 'Undo',
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (!task.completed)
-                  ElevatedButton(
-                    onPressed: () => _completeTask(task),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(80, 36),
-                    ),
-                    child: const Text('Complete'),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: () => _uncompleteTask(task),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(80, 36),
-                    ),
-                    child: const Text('Undo'),
-                  ),
-              ],
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
