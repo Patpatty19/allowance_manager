@@ -39,7 +39,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(
-                      color: Color(0xFF929982),
+                      color: Color(0xFF6BAB90),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -54,7 +54,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2E3440),
+                      color: Color(0xFF5E4C5A),
                     ),
                   ),
                 ],
@@ -65,7 +65,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                 decoration: const InputDecoration(
                   labelText: 'Transaction Name',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.receipt, color: Color(0xFF929982)),
+                  prefixIcon: Icon(Icons.receipt, color: Color(0xFF6BAB90)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -78,7 +78,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                 decoration: const InputDecoration(
                   labelText: 'Amount',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.monetization_on, color: Color(0xFF929982)),
+                  prefixIcon: Icon(Icons.monetization_on, color: Color(0xFF6BAB90)),
                 ),
               ),
               const SizedBox(height: 32),
@@ -89,27 +89,28 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     onPressed: () => Navigator.pop(context),
                     child: const Text(
                       'Cancel',
-                      style: TextStyle(color: Color(0xFF929982)),
+                      style: TextStyle(color: Color(0xFF6BAB90)),
                     ),
                   ),
                   const SizedBox(width: 16),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF929982),
+                      backgroundColor: const Color(0xFF6BAB90),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
                     onPressed: () async {
                       final navigator = Navigator.of(context);
                       final name = nameController.text.trim();
-                      final amount = amountController.text.trim();
-                      if (name.isNotEmpty && amount.isNotEmpty && widget.userId != null) {
+                      final amountText = amountController.text.trim();
+                      if (name.isNotEmpty && amountText.isNotEmpty && widget.userId != null) {
+                        final amount = double.tryParse(amountText) ?? 0.0;
                         await FirebaseFirestore.instance.collection('transactions').add({
-                          'name': name,
-                          'amount': amount, // Regular spending transaction (no + prefix)
+                          'description': name,
+                          'amount': -amount.abs(), // Store as negative for spending
                           'timestamp': FieldValue.serverTimestamp(),
                           'userId': widget.userId,
-                          // No 'type' field means it's a regular spending transaction
+                          'type': 'Purchase', // Mark as purchase transaction
                         });
                         navigator.pop();
                       }
@@ -136,13 +137,13 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF929982),
+        backgroundColor: const Color(0xFF6BAB90),
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         actions: [
           DropdownButton<String>(
             value: _sortOrder,
-            dropdownColor: const Color(0xFFC5EDAC),
+            dropdownColor: const Color(0xFFE1F0C4),
             underline: Container(),
             icon: const Icon(Icons.sort, color: Colors.white),
             items: const [
@@ -178,9 +179,9 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
               }
               var transactions = snapshot.data?.docs.map((doc) => _Transaction.fromFirestore(doc)).toList() ?? [];
               if (_sortOrder == 'asc') {
-                transactions.sort((a, b) => (int.tryParse(a.amount) ?? 0).compareTo(int.tryParse(b.amount) ?? 0));
+                transactions.sort((a, b) => a.amount.compareTo(b.amount));
               } else if (_sortOrder == 'desc') {
-                transactions.sort((a, b) => (int.tryParse(b.amount) ?? 0).compareTo(int.tryParse(a.amount) ?? 0));
+                transactions.sort((a, b) => b.amount.compareTo(a.amount));
               } else {
                 transactions.sort((a, b) => (b.timestamp ?? DateTime(0)).compareTo(a.timestamp ?? DateTime(0)));
               }
@@ -222,13 +223,13 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              tx.amount.startsWith('+') 
-                                  ? '+₱${tx.amount.substring(1)}' // Keep the + for rewards
-                                  : '-₱${tx.amount}', // Add - for spending
+                              tx.amount >= 0 
+                                  ? '+₱${tx.amount.toStringAsFixed(2)}' // Positive amounts (rewards, allowance)
+                                  : '-₱${tx.amount.abs().toStringAsFixed(2)}', // Negative amounts (spending)
                               style: TextStyle(
                                 fontWeight: FontWeight.bold, 
                                 fontSize: 16, 
-                                color: tx.amount.startsWith('+') ? const Color(0xFF99C2A2) : const Color(0xFFE57373),
+                                color: tx.amount >= 0 ? const Color(0xFF99C2A2) : const Color(0xFFE57373),
                               ),
                             ),
                             IconButton(
@@ -282,7 +283,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
         child: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF929982), Color(0xFF7A918D)],
+              colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -355,7 +356,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
 class _Transaction {
   final String id;
   final String name;
-  final String amount;
+  final double amount;
   final DateTime? timestamp;
   final String? type;
   
@@ -363,10 +364,23 @@ class _Transaction {
 
   factory _Transaction.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    // Handle both string and numeric amount formats
+    double amount = 0.0;
+    final amountData = data['amount'];
+    
+    if (amountData is num) {
+      amount = amountData.toDouble();
+    } else if (amountData is String) {
+      // Parse string amounts like "+200" or "-100"
+      final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
+      amount = double.tryParse(cleanAmount) ?? 0.0;
+    }
+    
     return _Transaction(
       doc.id,
-      data['name'] ?? '',
-      data['amount'] ?? '',
+      data['name'] ?? data['description'] ?? '',
+      amount,
       (data['timestamp'] as Timestamp?)?.toDate(),
       data['type'], // This will be null for old transactions
     );

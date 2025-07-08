@@ -68,7 +68,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF929982),
+        backgroundColor: const Color(0xFF6BAB90),
         foregroundColor: Colors.white,
       ),
       body: Container(
@@ -77,8 +77,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFDBFEB8),
-              Color(0xFFC5EDAC),
+              Color(0xFFFFE2D1),
+              Color(0xFFE1F0C4),
             ],
           ),
         ),
@@ -98,7 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const Icon(
                       Icons.lock_reset,
                       size: 80,
-                      color: Color(0xFF929982),
+                      color: Color(0xFF6BAB90),
                     ),
                     const SizedBox(height: 24),
               const Text(
@@ -189,7 +189,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           _resetPassword();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF929982),
+                          backgroundColor: const Color(0xFF6BAB90),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
@@ -206,7 +206,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 },
                 child: const Text(
                   'Back to Login',
-                  style: TextStyle(color: Color(0xFF929982)),
+                  style: TextStyle(color: Color(0xFF6BAB90)),
                 ),
               ),
                   ],

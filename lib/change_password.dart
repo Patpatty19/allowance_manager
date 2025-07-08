@@ -135,7 +135,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF929982),
+        backgroundColor: const Color(0xFF6BAB90),
         foregroundColor: Colors.white,
       ),
       body: Container(
@@ -144,8 +144,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFDBFEB8),
-              Color(0xFFC5EDAC),
+              Color(0xFFFFE2D1),
+              Color(0xFFE1F0C4),
             ],
           ),
         ),
@@ -165,7 +165,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const Icon(
                       Icons.lock_outline,
                       size: 80,
-                      color: Color(0xFF929982),
+                      color: Color(0xFF6BAB90),
                     ),
                     const SizedBox(height: 24),
                     const Text(
@@ -173,7 +173,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E3440),
+                        color: Color(0xFF5E4C5A),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -290,7 +290,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     : ElevatedButton(
                         onPressed: _changePassword,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF929982),
+                          backgroundColor: const Color(0xFF6BAB90),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
@@ -307,7 +307,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 },
                 child: const Text(
                   'Cancel',
-                  style: TextStyle(color: Color(0xFF929982)),
+                  style: TextStyle(color: Color(0xFF6BAB90)),
                 ),
               ),
                   ],

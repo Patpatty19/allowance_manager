@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'user_screen.dart';
+import 'routes.dart';
 
 class UserLoginScreen extends StatefulWidget {
   const UserLoginScreen({super.key});
@@ -66,14 +66,13 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
 
       // Navigate to user screen
       if (mounted) {
-        Navigator.pushReplacement(
+        Navigator.pushReplacementNamed(
           context,
-          MaterialPageRoute(
-            builder: (context) => UserScreen(
-              userId: selectedUserId!,
-              userName: userData['name'],
-            ),
-          ),
+          AppRoutes.userScreen,
+          arguments: {
+            'userId': selectedUserId!,
+            'userName': userData['name'],
+          },
         );
       }
     } catch (e) {
@@ -92,7 +91,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Login'),
-        backgroundColor: const Color(0xFF929982),
+        backgroundColor: const Color(0xFF55917F),
         foregroundColor: Colors.white,
       ),
       body: Container(
@@ -101,8 +100,8 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFDBFEB8),
-              Color(0xFFC5EDAC),
+              Color(0xFFFFE2D1),
+              Color(0xFFE1F0C4),
             ],
           ),
         ),
@@ -140,7 +139,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2E3440),
+                            color: Color(0xFF5E4C5A),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -148,7 +147,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> {
                           'Select your name and enter your PIN',
                           style: TextStyle(
                             fontSize: 16,
-                            color: Color(0xFF929982),
+                            color: Color(0xFF6BAB90),
                           ),
                           textAlign: TextAlign.center,
                         ),

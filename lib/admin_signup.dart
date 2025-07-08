@@ -109,7 +109,7 @@ class _AdminSignupState extends State<AdminSignup> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF929982),
+        backgroundColor: const Color(0xFF6BAB90),
         foregroundColor: Colors.white,
       ),
       body: Container(
@@ -118,8 +118,8 @@ class _AdminSignupState extends State<AdminSignup> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFDBFEB8),
-              Color(0xFFC5EDAC),
+              Color(0xFFFFE2D1),
+              Color(0xFFE1F0C4),
             ],
           ),
         ),
@@ -141,7 +141,7 @@ class _AdminSignupState extends State<AdminSignup> {
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2E3440),
+                        color: Color(0xFF5E4C5A),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -210,7 +210,7 @@ class _AdminSignupState extends State<AdminSignup> {
                       child: ElevatedButton(
                         onPressed: _signup,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF929982),
+                          backgroundColor: const Color(0xFF6BAB90),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -229,7 +229,7 @@ class _AdminSignupState extends State<AdminSignup> {
                 },
                 child: const Text(
                   'Already have an account? Sign In',
-                  style: TextStyle(color: Color(0xFF929982)),
+                  style: TextStyle(color: Color(0xFF6BAB90)),
                 ),
               ),
                   ],
