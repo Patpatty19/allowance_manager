@@ -1,11 +1,11 @@
-# Personal Allowance Manager
+# PayGoal
 
-A multi-user allowance management Flutter application with Firebase backend.
+A smart allowance and goal tracking Flutter application with Firebase backend, designed for families who want to teach financial literacy.
 
 ## Features
 
 - **Admin Dashboard**: User management, task assignment, transaction monitoring
-- **User Interface**: PIN-based login, task completion, transaction history
+- **User Interface**: PIN-based login, task completion, transaction history  
 - **Firebase Integration**: Real-time data synchronization, user authentication
 - **Multi-Platform**: Web, iOS, Android support
 - **Secure**: Firebase Auth with password reset functionality

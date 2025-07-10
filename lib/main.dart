@@ -25,7 +25,7 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Personal Allowance Manager',
+      title: 'PayGoal',
       theme: ThemeData(
         // Primary color from the new palette - using Cambridge blue for main elements
         primarySwatch: MaterialColor(0xFF6BAB90, {

@@ -539,7 +539,6 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                   child: StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('transactions')
-                        .where('userId', isEqualTo: widget.userId)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -553,7 +552,17 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                         return Center(child: Text('Error: ${snapshot.error}'));
                       }
                       
-                      var transactions = snapshot.data?.docs.map((doc) => _Transaction.fromFirestore(doc)).toList() ?? [];
+                      // Filter transactions to include null/empty userId for backward compatibility
+                      var allTransactions = snapshot.data?.docs ?? [];
+                      var filteredTransactions = allTransactions.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final userId = data['userId'];
+                        return userId == widget.userId || 
+                               userId == null || 
+                               (userId as String?)?.isEmpty == true;
+                      }).toList();
+                      
+                      var transactions = filteredTransactions.map((doc) => _Transaction.fromFirestore(doc)).toList();
                       
                       // Sort transactions
                       if (_sortOrder == 'asc') {

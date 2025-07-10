@@ -1,5 +1,5 @@
-name: allowance_manager
-description: "A new Flutter project."
+name: paygoal
+description: "PayGoal - Smart allowance and goal tracking app for families."
 publish_to: 'none'
 version: 0.1.0
 

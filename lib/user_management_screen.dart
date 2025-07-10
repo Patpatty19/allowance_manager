@@ -858,7 +858,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                   ),
                                                   const SizedBox(height: 12),
                                                   const Text(
-                                                    'Add your first family member above to get started with allowance management!',
+                                                    'Add your first family member above to get started with PayGoal!',
                                                     style: TextStyle(
                                                       fontSize: 16,
                                                       color: Color(0xFF55917F),

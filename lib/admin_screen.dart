@@ -51,10 +51,12 @@ class _AdminScreenState extends State<AdminScreen> {
 
       await FirebaseFirestore.instance.collection('tasks').add({
         'userId': widget.selectedUserId,
-        'taskName': _taskController.text.trim(),
+        'title': _taskController.text.trim(),
+        'taskName': _taskController.text.trim(), // Keep both for compatibility
         'taskType': _selectedTaskType,
         'reward': reward,
-        'isCompleted': false,
+        'completed': false,
+        'isCompleted': false, // Keep both for compatibility
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -88,7 +90,13 @@ class _AdminScreenState extends State<AdminScreen> {
         'userId': widget.selectedUserId,
         'type': _selectedTransactionType,
         'amount': amount,
-        'description': '$_selectedTransactionType transaction',
+        'description': _selectedTransactionType == 'Allowance' 
+            ? 'Weekly Allowance' 
+            : _selectedTransactionType == 'Purchase' 
+              ? 'Purchase Transaction' 
+              : _selectedTransactionType == 'Withdrawal'
+                ? 'Money Withdrawal'
+                : '$_selectedTransactionType',
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -101,6 +109,11 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<void> _markTaskCompleted(String taskId, double reward) async {
     try {
+      // Get task details first
+      final taskDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
+      final taskData = taskDoc.data();
+      final taskName = taskData?['taskName'] as String? ?? taskData?['title'] as String? ?? 'Task';
+      
       // Mark task as completed
       await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
         'isCompleted': true,
@@ -112,7 +125,7 @@ class _AdminScreenState extends State<AdminScreen> {
         'userId': widget.selectedUserId,
         'type': 'Task Reward',
         'amount': reward,
-        'description': 'Task completion reward',
+        'description': 'Task Completed: $taskName',
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -131,44 +144,47 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  double _calculateBalance(List<QueryDocumentSnapshot> transactions) {
-    double balance = 0.0;
-    for (var transaction in transactions) {
-      final data = transaction.data() as Map<String, dynamic>;
-      final type = data['type'] as String? ?? '';
-      
+  double _calculateBalance(List<Map<String, dynamic>> transactions) {
+    double spent = 0.0;
+    double earned = 0.0;
+    
+    for (final tx in transactions) {
       // Handle both string and numeric amount formats
       double amount = 0.0;
-      final amountData = data['amount'];
+      final amountData = tx['amount'];
       
       if (amountData is num) {
         amount = amountData.toDouble();
       } else if (amountData is String) {
-        // Parse string amounts like "+200" or "-100"
+        // Parse string amounts like "+200" or "-100" or "100"
         final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
         amount = double.tryParse(cleanAmount) ?? 0.0;
         
-        // If the original string started with '+' or didn't have a sign, it's positive
-        // If it started with '-', it's negative (already handled by parseDouble)
-        if (amountData.startsWith('+')) {
-          amount = amount.abs(); // Ensure positive
-        } else if (!amountData.startsWith('-') && !amountData.startsWith('+')) {
-          // No sign means positive for older data
-          amount = amount.abs();
+        // For old data, positive strings (like "100" or "+100") are earnings
+        // Negative strings (like "-100") are spending
+        if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
+          amount = amount.abs(); // Ensure positive for earnings
+        } else if (amountData.startsWith('-')) {
+          amount = -amount.abs(); // Ensure negative for spending
         }
       }
       
-      // Determine if this is a credit or debit based on type
+      final type = tx['type'] as String? ?? '';
+      
+      // Determine if this is earning or spending based on type and amount
       if (type.toLowerCase().contains('allowance') || 
           type.toLowerCase().contains('reward') || 
-          type.toLowerCase().contains('deposit')) {
-        balance += amount;
+          type.toLowerCase().contains('deposit') ||
+          amount > 0) {
+        earned += amount.abs();
       } else if (type.toLowerCase().contains('purchase') || 
-                 type.toLowerCase().contains('withdrawal')) {
-        balance -= amount;
+                 type.toLowerCase().contains('withdrawal') ||
+                 amount < 0) {
+        spent += amount.abs();
       }
     }
-    return balance;
+    
+    return earned - spent;
   }
 
   @override
@@ -310,7 +326,7 @@ class _AdminScreenState extends State<AdminScreen> {
               const SizedBox(height: 16),
               
               Text(
-                'Select a user to manage their allowance and tasks',
+                'Select a user to manage their goals and tasks',
                 style: TextStyle(
                   fontSize: 18,
                   color: AppColors.textDark.withValues(alpha: 0.7),
@@ -390,7 +406,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Family Allowance Management System',
+                      'PayGoal Family Management System',
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textDark.withValues(alpha: 0.8),
@@ -589,14 +605,30 @@ class _AdminScreenState extends State<AdminScreen> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('tasks')
-                    .where('userId', isEqualTo: widget.selectedUserId)
-                    .where('isCompleted', isEqualTo: false)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                  if (!snapshot.hasData) {
+                    return _buildStatCard('Pending Tasks', '0', Icons.pending_actions, AppColors.accent);
+                  }
+                  
+                  // Filter tasks by userId - include null/empty for backward compatibility
+                  final allTasks = snapshot.data?.docs ?? [];
+                  final userTasks = allTasks.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final userId = data['userId'] as String?;
+                    return userId == widget.selectedUserId || 
+                           userId == null || 
+                           userId.isEmpty;
+                  }).toList();
+                  
+                  final pendingTasks = userTasks.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return !(data['isCompleted'] as bool? ?? false);
+                  }).length;
+                  
                   return _buildStatCard(
                     'Pending Tasks',
-                    count.toString(),
+                    pendingTasks.toString(),
                     Icons.pending_actions,
                     AppColors.accent,
                   );
@@ -608,14 +640,30 @@ class _AdminScreenState extends State<AdminScreen> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('tasks')
-                    .where('userId', isEqualTo: widget.selectedUserId)
-                    .where('isCompleted', isEqualTo: true)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                  if (!snapshot.hasData) {
+                    return _buildStatCard('Completed', '0', Icons.check_circle, AppColors.success);
+                  }
+                  
+                  // Filter tasks by userId - include null/empty for backward compatibility
+                  final allTasks = snapshot.data?.docs ?? [];
+                  final userTasks = allTasks.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final userId = data['userId'] as String?;
+                    return userId == widget.selectedUserId || 
+                           userId == null || 
+                           userId.isEmpty;
+                  }).toList();
+                  
+                  final completedTasks = userTasks.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    return data['isCompleted'] as bool? ?? false;
+                  }).length;
+                  
                   return _buildStatCard(
                     'Completed',
-                    count.toString(),
+                    completedTasks.toString(),
                     Icons.check_circle,
                     AppColors.success,
                   );
@@ -627,13 +675,23 @@ class _AdminScreenState extends State<AdminScreen> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('transactions')
-                    .where('userId', isEqualTo: widget.selectedUserId)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  final count = snapshot.hasData ? snapshot.data!.docs.length : 0;
+                  if (!snapshot.hasData) {
+                    return _buildStatCard('Transactions', '0', Icons.history, AppColors.primary);
+                  }
+                  
+                  // Filter transactions by userId - include null/empty for backward compatibility
+                  final allTransactions = snapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+                  final transactions = allTransactions.where((tx) => 
+                    tx['userId'] == widget.selectedUserId || 
+                    tx['userId'] == null || 
+                    (tx['userId'] as String?)?.isEmpty == true
+                  ).toList();
+                  
                   return _buildStatCard(
                     'Transactions',
-                    count.toString(),
+                    transactions.length.toString(),
                     Icons.history,
                     AppColors.primary,
                   );
@@ -649,31 +707,54 @@ class _AdminScreenState extends State<AdminScreen> {
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
-                    .collection('tasks')
-                    .where('userId', isEqualTo: widget.selectedUserId)
-                    .where('isCompleted', isEqualTo: true)
+                    .collection('transactions')
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return _buildStatCard('Total Earned', '\$0.00', Icons.monetization_on, Colors.green);
+                    return _buildStatCard('Total Earned', '₱0.00', Icons.monetization_on, Colors.green);
                   }
                   
+                  // Filter transactions by userId - include null/empty for backward compatibility
+                  final allTransactions = snapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+                  final transactions = allTransactions.where((tx) => 
+                    tx['userId'] == widget.selectedUserId || 
+                    tx['userId'] == null || 
+                    (tx['userId'] as String?)?.isEmpty == true
+                  ).toList();
+                  
                   double totalEarned = 0.0;
-                  for (var doc in snapshot.data!.docs) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final rewardData = data['reward'];
+                  for (final tx in transactions) {
+                    // Handle both string and numeric amount formats
+                    double amount = 0.0;
+                    final amountData = tx['amount'];
                     
-                    if (rewardData is num) {
-                      totalEarned += rewardData.toDouble();
-                    } else if (rewardData is String) {
-                      final cleanReward = rewardData.replaceAll(RegExp(r'[^\d.-]'), '');
-                      totalEarned += double.tryParse(cleanReward) ?? 0.0;
+                    if (amountData is num) {
+                      amount = amountData.toDouble();
+                    } else if (amountData is String) {
+                      final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
+                      amount = double.tryParse(cleanAmount) ?? 0.0;
+                      
+                      if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
+                        amount = amount.abs();
+                      } else if (amountData.startsWith('-')) {
+                        amount = -amount.abs();
+                      }
+                    }
+                    
+                    final type = tx['type'] as String? ?? '';
+                    
+                    // Only count earnings
+                    if (type.toLowerCase().contains('allowance') || 
+                        type.toLowerCase().contains('reward') || 
+                        type.toLowerCase().contains('deposit') ||
+                        amount > 0) {
+                      totalEarned += amount.abs();
                     }
                   }
                   
                   return _buildStatCard(
                     'Total Earned',
-                    '\$${totalEarned.toStringAsFixed(2)}',
+                    '₱${totalEarned.toStringAsFixed(2)}',
                     Icons.monetization_on,
                     Colors.green,
                   );
@@ -685,30 +766,52 @@ class _AdminScreenState extends State<AdminScreen> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('transactions')
-                    .where('userId', isEqualTo: widget.selectedUserId)
-                    .where('type', whereIn: ['Purchase', 'Withdrawal'])
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return _buildStatCard('Total Spent', '\$0.00', Icons.shopping_cart, Colors.red);
+                    return _buildStatCard('Total Spent', '₱0.00', Icons.shopping_cart, Colors.red);
                   }
                   
+                  // Filter transactions by userId - include null/empty for backward compatibility
+                  final allTransactions = snapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+                  final transactions = allTransactions.where((tx) => 
+                    tx['userId'] == widget.selectedUserId || 
+                    tx['userId'] == null || 
+                    (tx['userId'] as String?)?.isEmpty == true
+                  ).toList();
+                  
                   double totalSpent = 0.0;
-                  for (var doc in snapshot.data!.docs) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final amountData = data['amount'];
+                  for (final tx in transactions) {
+                    // Handle both string and numeric amount formats
+                    double amount = 0.0;
+                    final amountData = tx['amount'];
                     
                     if (amountData is num) {
-                      totalSpent += amountData.toDouble();
+                      amount = amountData.toDouble();
                     } else if (amountData is String) {
                       final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
-                      totalSpent += double.tryParse(cleanAmount) ?? 0.0;
+                      amount = double.tryParse(cleanAmount) ?? 0.0;
+                      
+                      if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
+                        amount = amount.abs();
+                      } else if (amountData.startsWith('-')) {
+                        amount = -amount.abs();
+                      }
+                    }
+                    
+                    final type = tx['type'] as String? ?? '';
+                    
+                    // Only count spending
+                    if (type.toLowerCase().contains('purchase') || 
+                        type.toLowerCase().contains('withdrawal') ||
+                        amount < 0) {
+                      totalSpent += amount.abs();
                     }
                   }
                   
                   return _buildStatCard(
                     'Total Spent',
-                    '\$${totalSpent.toStringAsFixed(2)}',
+                    '₱${totalSpent.toStringAsFixed(2)}',
                     Icons.shopping_cart,
                     Colors.red,
                   );
@@ -720,15 +823,28 @@ class _AdminScreenState extends State<AdminScreen> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('tasks')
-                    .where('userId', isEqualTo: widget.selectedUserId)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  if (!snapshot.hasData) {
                     return _buildStatCard('Completion Rate', '0%', Icons.trending_up, Colors.orange);
                   }
                   
-                  final totalTasks = snapshot.data!.docs.length;
-                  final completedTasks = snapshot.data!.docs.where((doc) {
+                  // Filter tasks by userId - include null/empty for backward compatibility
+                  final allTasks = snapshot.data?.docs ?? [];
+                  final userTasks = allTasks.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    final userId = data['userId'] as String?;
+                    return userId == widget.selectedUserId || 
+                           userId == null || 
+                           userId.isEmpty;
+                  }).toList();
+                  
+                  if (userTasks.isEmpty) {
+                    return _buildStatCard('Completion Rate', '0%', Icons.trending_up, Colors.orange);
+                  }
+                  
+                  final totalTasks = userTasks.length;
+                  final completedTasks = userTasks.where((doc) {
                     final data = doc.data() as Map<String, dynamic>;
                     return data['isCompleted'] as bool? ?? false;
                   }).length;
@@ -809,7 +925,6 @@ class _AdminScreenState extends State<AdminScreen> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('transactions')
-          .where('userId', isEqualTo: widget.selectedUserId)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -829,7 +944,15 @@ class _AdminScreenState extends State<AdminScreen> {
           );
         }
 
-        final balance = _calculateBalance(snapshot.data!.docs);
+        // Filter transactions by userId - include null/empty for backward compatibility
+        final allTransactions = snapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+        final transactions = allTransactions.where((tx) => 
+          tx['userId'] == widget.selectedUserId || 
+          tx['userId'] == null || 
+          (tx['userId'] as String?)?.isEmpty == true
+        ).toList();
+
+        final balance = _calculateBalance(transactions);
 
         return Container(
           width: double.infinity,
@@ -894,7 +1017,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '\$${balance.toStringAsFixed(2)}',
+                      '₱${balance.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 42,
@@ -1037,7 +1160,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   controller: _rewardController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Reward (\$)',
+                    labelText: 'Reward (₱)',
                     labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1157,7 +1280,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   controller: _transactionController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Amount (\$)',
+                    labelText: 'Amount (₱)',
                     labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -1232,7 +1355,6 @@ class _AdminScreenState extends State<AdminScreen> {
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('tasks')
-                .where('userId', isEqualTo: widget.selectedUserId)
                 .orderBy('createdAt', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
@@ -1240,7 +1362,40 @@ class _AdminScreenState extends State<AdminScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (!snapshot.hasData) {
+                return Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.task_alt,
+                        size: 48,
+                        color: AppColors.textDark,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No tasks yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Filter tasks by userId - include null/empty for backward compatibility
+              final allTasks = snapshot.data?.docs ?? [];
+              final userTasks = allTasks.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final userId = data['userId'] as String?;
+                return userId == widget.selectedUserId || 
+                       userId == null || 
+                       (userId.isEmpty);
+              }).toList();
+
+              if (userTasks.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(32),
                   child: Column(
@@ -1266,12 +1421,12 @@ class _AdminScreenState extends State<AdminScreen> {
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
+                itemCount: userTasks.length,
                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
-                  final doc = snapshot.data!.docs[index];
+                  final doc = userTasks[index];
                   final data = doc.data() as Map<String, dynamic>;
-                  final taskName = data['taskName'] as String? ?? 'Unnamed Task';
+                  final taskName = data['taskName'] as String? ?? data['title'] as String? ?? 'Unnamed Task';
                   final taskType = data['taskType'] as String? ?? 'Task';
                   final isCompleted = data['isCompleted'] as bool? ?? false;
 
@@ -1336,7 +1491,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '\$${reward.toStringAsFixed(2)}',
+                                    '₱${reward.toStringAsFixed(2)}',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: AppColors.accent,
@@ -1408,16 +1563,48 @@ class _AdminScreenState extends State<AdminScreen> {
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('transactions')
-                .where('userId', isEqualTo: widget.selectedUserId)
                 .orderBy('timestamp', descending: true)
-                .limit(10)
+                .limit(50)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (!snapshot.hasData) {
+                return Container(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.history,
+                        size: 48,
+                        color: AppColors.textDark,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No transactions yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Filter transactions by userId - include null/empty for backward compatibility
+              final allTransactions = snapshot.data?.docs ?? [];
+              final userTransactions = allTransactions.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final userId = data['userId'] as String?;
+                return userId == widget.selectedUserId || 
+                       userId == null || 
+                       userId.isEmpty;
+              }).take(10).toList();
+
+              if (userTransactions.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(32),
                   child: Column(
@@ -1443,10 +1630,10 @@ class _AdminScreenState extends State<AdminScreen> {
               return ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
+                itemCount: userTransactions.length,
                 separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final doc = snapshot.data!.docs[index];
+                  final doc = userTransactions[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final type = data['type'] as String? ?? 'Transaction';
                   final description = data['description'] as String? ?? '';
@@ -1467,6 +1654,9 @@ class _AdminScreenState extends State<AdminScreen> {
                   final isPositive = type.toLowerCase().contains('allowance') ||
                       type.toLowerCase().contains('reward') ||
                       type.toLowerCase().contains('deposit');
+
+                  // Use the helper function to get display name
+                  final displayName = _getTransactionDisplayName(data);
 
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -1490,19 +1680,19 @@ class _AdminScreenState extends State<AdminScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                type,
+                                displayName,
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textDark,
                                 ),
                               ),
-                              if (description.isNotEmpty)
+                              if (description.isNotEmpty && !description.contains('Task Completed:'))
                                 Text(
-                                  description,
+                                  type,
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.textDark,
+                                    color: AppColors.textDark.withValues(alpha: 0.7),
                                   ),
                                 ),
                               if (timestamp != null)
@@ -1517,7 +1707,7 @@ class _AdminScreenState extends State<AdminScreen> {
                           ),
                         ),
                         Text(
-                          '${isPositive ? '+' : '-'}\$${amount.toStringAsFixed(2)}',
+                          '${isPositive ? '+' : '-'}₱${amount.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -1717,7 +1907,7 @@ class _AdminScreenState extends State<AdminScreen> {
               controller: allowanceController,
               keyboardType: TextInputType.number,
               decoration: InputDecoration(
-                labelText: 'Allowance Amount (\$)',
+                labelText: 'Allowance Amount (₱)',
                 prefixIcon: Icon(Icons.attach_money, color: AppColors.success),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -1751,7 +1941,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     'timestamp': FieldValue.serverTimestamp(),
                   });
                   Navigator.pop(context);
-                  _showSnackBar('Weekly allowance of \$${amount.toStringAsFixed(2)} added!');
+                  _showSnackBar('Weekly allowance of ₱${amount.toStringAsFixed(2)} added!');
                 } catch (e) {
                   _showSnackBar('Error adding allowance: $e');
                 }
@@ -2046,7 +2236,7 @@ class _AdminScreenState extends State<AdminScreen> {
     final timeAgo = _getTimeAgo(timestamp.toDate());
 
     if (type == 'task') {
-      final taskName = data['taskName'] as String? ?? 'Unnamed Task';
+      final taskName = data['taskName'] as String? ?? data['title'] as String? ?? 'Unnamed Task';
       final isCompleted = data['isCompleted'] as bool? ?? false;
       
       return Container(
@@ -2092,11 +2282,10 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       );
     } else {
-      final transactionType = data['type'] as String? ?? 'Transaction';
+      final data = activity['data'] as Map<String, dynamic>;
+      final displayName = _getTransactionDisplayName(data);
       final amount = _parseAmount(data['amount']);
-      final isPositive = transactionType.toLowerCase().contains('allowance') ||
-          transactionType.toLowerCase().contains('reward') ||
-          transactionType.toLowerCase().contains('deposit');
+      final isPositive = amount > 0;
       
       return Container(
         padding: const EdgeInsets.all(12),
@@ -2120,7 +2309,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '$transactionType: ${isPositive ? '+' : '-'}\$${amount.toStringAsFixed(2)}',
+                    '$displayName: ${isPositive ? '+' : '-'}₱${amount.abs().toStringAsFixed(2)}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -2318,5 +2507,46 @@ class _AdminScreenState extends State<AdminScreen> {
       return double.tryParse(cleanAmount) ?? 0.0;
     }
     return 0.0;
+  }
+
+  String _getTransactionDisplayName(Map<String, dynamic> data) {
+    // Use the same logic as user transaction history: name ?? description ?? fallback
+    final name = data['name'] as String?;
+    final description = data['description'] as String?;
+    
+    // First priority: name field
+    if (name != null && name.isNotEmpty) {
+      return name;
+    }
+    
+    // Second priority: description field
+    if (description != null && description.isNotEmpty) {
+      return description;
+    }
+    
+    // Fallback to type-based naming
+    final type = data['type'] as String? ?? '';
+    
+    switch (type.toLowerCase()) {
+      case 'task reward':
+      case 'task_reward':
+        return 'Task Completion Reward';
+      case 'allowance':
+        return 'Weekly Allowance';
+      case 'bonus':
+        return 'Bonus Payment';
+      case 'gift':
+        return 'Gift Money';
+      case 'purchase':
+        return 'Purchase';
+      case 'savings':
+        return 'Money Saved';
+      case 'withdrawal':
+        return 'Money Withdrawal';
+      case 'deposit':
+        return 'Money Deposit';
+      default:
+        return type.isNotEmpty ? type : 'Transaction';
+    }
   }
 }

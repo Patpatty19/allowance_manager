@@ -56,7 +56,7 @@ class MainMenuScreen extends StatelessWidget {
                   
                   // Title
                   Text(
-                    'Personal Allowance Manager',
+                    'PayGoal',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: const Color(0xFF5E4C5A),
                       fontWeight: FontWeight.bold,
@@ -74,7 +74,7 @@ class MainMenuScreen extends StatelessWidget {
                   
                   // Subtitle
                   Text(
-                    'Manage allowances, tasks, and rewards\nfor the whole family',
+                    'Smart allowance and goal tracking\nfor families who care about financial literacy',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: const Color(0xFF55917F),
                       height: 1.5,
