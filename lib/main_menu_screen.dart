@@ -44,10 +44,11 @@ class MainMenuScreen extends StatelessWidget {
                         height: 200,
                         color: Colors.white,
                         padding: const EdgeInsets.all(20),
-                        child: const Icon(
-                          Icons.account_balance_wallet,
-                          size: 120,
-                          color: Color(0xFF6BAB90),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 160,
+                          height: 160,
+                          fit: BoxFit.contain,
                         ),
                       ),
                     ),
