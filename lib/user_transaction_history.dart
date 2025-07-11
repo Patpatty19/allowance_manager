@@ -45,6 +45,40 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
     super.dispose();
   }
 
+  // Helper function to calculate current balance including starting balance
+  Future<double> _getCurrentBalance() async {
+    if (widget.userId == null) return 0.0;
+
+    try {
+      // Get user's starting balance
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+      
+      final userData = userDoc.data() ?? <String, dynamic>{};
+      final startingBalance = (userData['balance'] as num?)?.toDouble() ?? 500.0;
+
+      // Get all transactions for this user
+      final transactionsSnapshot = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      double transactionTotal = 0.0;
+      for (final doc in transactionsSnapshot.docs) {
+        final data = doc.data();
+        final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+        transactionTotal += amount;
+      }
+
+      return startingBalance + transactionTotal;
+    } catch (e) {
+      print('Error calculating balance: $e');
+      return 0.0;
+    }
+  }
+
   void _showAddTransactionSheet(BuildContext context) {
     final TextEditingController nameController = TextEditingController();
     final TextEditingController amountController = TextEditingController();
@@ -280,7 +314,35 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                             if (name.isNotEmpty && amountText.isNotEmpty && widget.userId != null) {
                               final amount = double.tryParse(amountText) ?? 0.0;
                               
+                              if (amount <= 0) {
+                                scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Please enter a valid amount greater than 0'),
+                                    backgroundColor: Colors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                return;
+                              }
+                              
                               try {
+                                // Check current balance before allowing the purchase
+                                final currentBalance = await _getCurrentBalance();
+                                
+                                if (currentBalance < amount) {
+                                  scaffoldMessenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Insufficient balance! Current balance: ₱${currentBalance.toStringAsFixed(2)}. Cannot spend ₱${amount.toStringAsFixed(2)}.'),
+                                      backgroundColor: Colors.red,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      duration: const Duration(seconds: 4),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                
                                 // Add transaction with negative amount to reduce balance
                                 await FirebaseFirestore.instance.collection('transactions').add({
                                   'description': name,

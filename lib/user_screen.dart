@@ -50,6 +50,40 @@ class _UserScreenState extends State<UserScreen>
     return int.tryParse(RegExp(r'\d+').stringMatch(reward) ?? '0') ?? 0;
   }
 
+  // Helper function to calculate current balance including starting balance
+  Future<double> _getCurrentBalance() async {
+    if (widget.userId == null) return 0.0;
+
+    try {
+      // Get user's starting balance
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+      
+      final userData = userDoc.data() ?? <String, dynamic>{};
+      final startingBalance = (userData['balance'] as num?)?.toDouble() ?? 500.0;
+
+      // Get all transactions for this user
+      final transactionsSnapshot = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: widget.userId)
+          .get();
+
+      double transactionTotal = 0.0;
+      for (final doc in transactionsSnapshot.docs) {
+        final data = doc.data();
+        final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+        transactionTotal += amount;
+      }
+
+      return startingBalance + transactionTotal;
+    } catch (e) {
+      print('Error calculating balance: $e');
+      return 0.0;
+    }
+  }
+
   Future<void> _completeTask(_Task task) async {
     try {
       // Mark task as completed
@@ -642,91 +676,105 @@ class _UserScreenState extends State<UserScreen>
                       return Center(child: Text('Error: ${txSnapshot.error}'));
                     }
                     
-                    // Filter transactions by userId
-                    final allTransactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
-                    final transactions = allTransactions.where((tx) => 
-                      tx['userId'] == widget.userId || 
-                      tx['userId'] == null || 
-                      (tx['userId'] as String?)?.isEmpty == true
-                    ).toList();
-                    
-                    // Calculate spent and earned amounts from transactions only
-                    double spent = 0.0;
-                    double earned = 0.0;
-                    
-                    for (final tx in transactions) {
-                      // Handle both string and numeric amount formats
-                      double amount = 0.0;
-                      final amountData = tx['amount'];
-                      
-                      if (amountData is num) {
-                        amount = amountData.toDouble();
-                      } else if (amountData is String) {
-                        // Parse string amounts like "+200" or "-100" or "100"
-                        final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
-                        amount = double.tryParse(cleanAmount) ?? 0.0;
-                        
-                        // For old data, positive strings (like "100" or "+100") are earnings
-                        // Negative strings (like "-100") are spending
-                        if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
-                          amount = amount.abs(); // Ensure positive for earnings
-                        } else if (amountData.startsWith('-')) {
-                          amount = -amount.abs(); // Ensure negative for spending
+                    return FutureBuilder<double>(
+                      future: _getCurrentBalance(),
+                      builder: (context, balanceSnapshot) {
+                        if (balanceSnapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(50),
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6BAB90)),
+                              ),
+                            ),
+                          );
                         }
-                      }
-                      
-                      final type = tx['type'] as String? ?? '';
-                      
-                      // Determine if this is earning or spending based on type and amount
-                      if (type.toLowerCase().contains('allowance') || 
-                          type.toLowerCase().contains('reward') || 
-                          type.toLowerCase().contains('deposit') ||
-                          amount > 0) {
-                        earned += amount.abs();
-                      } else if (type.toLowerCase().contains('purchase') || 
-                                 type.toLowerCase().contains('withdrawal') ||
-                                 amount < 0) {
-                        spent += amount.abs();
-                      }
-                    }
-                    
-                    final balance = earned - spent;
-                    final completedTasks = tasks.where((task) => task.completed).length;
-                    
-                    return Column(
-                      children: [
-                        // Animated balance card
-                        _buildAnimatedBalanceCard(balance, completedTasks, tasks.length),
                         
-                        // Enhanced quick stats with better visual hierarchy
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildEnhancedStatCard(
-                                  'Earned',
-                                  '₱${earned.toStringAsFixed(2)}',
-                                  Icons.trending_up_rounded,
-                                  const Color(0xFF6BAB90),
-                                  0,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildEnhancedStatCard(
-                                  'Spent',
-                                  '₱${spent.toStringAsFixed(2)}',
-                                  Icons.trending_down_rounded,
-                                  const Color(0xFF55917F),
-                                  1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        final balance = balanceSnapshot.data ?? 0.0;
+                        final completedTasks = tasks.where((task) => task.completed).length;
                         
-                        const SizedBox(height: 20),
+                        // Filter transactions by userId for earned/spent calculation
+                        final allTransactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+                        final transactions = allTransactions.where((tx) => 
+                          tx['userId'] == widget.userId || 
+                          tx['userId'] == null || 
+                          (tx['userId'] as String?)?.isEmpty == true
+                        ).toList();
+                        
+                        // Calculate spent and earned amounts from transactions only
+                        double spent = 0.0;
+                        double earned = 0.0;
+                        
+                        for (final tx in transactions) {
+                          // Handle both string and numeric amount formats
+                          double amount = 0.0;
+                          final amountData = tx['amount'];
+                          
+                          if (amountData is num) {
+                            amount = amountData.toDouble();
+                          } else if (amountData is String) {
+                            // Parse string amounts like "+200" or "-100" or "100"
+                            final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
+                            amount = double.tryParse(cleanAmount) ?? 0.0;
+                            
+                            // For old data, positive strings (like "100" or "+100") are earnings
+                            // Negative strings (like "-100") are spending
+                            if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
+                              amount = amount.abs(); // Ensure positive for earnings
+                            } else if (amountData.startsWith('-')) {
+                              amount = -amount.abs(); // Ensure negative for spending
+                            }
+                          }
+                          
+                          final type = tx['type'] as String? ?? '';
+                          
+                          // Determine if this is earning or spending based on type and amount
+                          if (type.toLowerCase().contains('allowance') || 
+                              type.toLowerCase().contains('reward') || 
+                              type.toLowerCase().contains('deposit') ||
+                              amount > 0) {
+                            earned += amount.abs();
+                          } else if (type.toLowerCase().contains('purchase') || 
+                                     type.toLowerCase().contains('withdrawal') ||
+                                     amount < 0) {
+                            spent += amount.abs();
+                          }
+                        }
+                        
+                        return Column(
+                          children: [
+                            // Animated balance card
+                            _buildAnimatedBalanceCard(balance, completedTasks, tasks.length),
+                            
+                            // Enhanced quick stats with better visual hierarchy
+                            Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 20),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildEnhancedStatCard(
+                                      'Earned',
+                                      '₱${earned.toStringAsFixed(2)}',
+                                      Icons.trending_up_rounded,
+                                      const Color(0xFF6BAB90),
+                                      0,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildEnhancedStatCard(
+                                      'Spent',
+                                      '₱${spent.toStringAsFixed(2)}',
+                                      Icons.trending_down_rounded,
+                                      const Color(0xFF55917F),
+                                      1,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        
+                            const SizedBox(height: 20),
                         
                         // Tasks section header
                         Container(
@@ -881,6 +929,8 @@ class _UserScreenState extends State<UserScreen>
                         
                         const SizedBox(height: 90), // Add extra space for bottom navigation
                       ],
+                    );
+                      },
                     );
                   },
                 );
