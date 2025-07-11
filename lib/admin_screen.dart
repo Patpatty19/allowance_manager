@@ -31,6 +31,40 @@ class _AdminScreenState extends State<AdminScreen> {
     super.dispose();
   }
 
+  // Helper function to calculate current balance
+  Future<double> _getCurrentBalance() async {
+    if (widget.selectedUserId == null) return 0.0;
+
+    try {
+      // Get user's starting balance
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.selectedUserId)
+          .get();
+      
+      final userData = userDoc.data() ?? <String, dynamic>{};
+      final startingBalance = (userData['balance'] as num?)?.toDouble() ?? 500.0;
+
+      // Get all transactions for this user
+      final transactionsSnapshot = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: widget.selectedUserId)
+          .get();
+
+      double transactionTotal = 0.0;
+      for (final doc in transactionsSnapshot.docs) {
+        final data = doc.data();
+        final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+        transactionTotal += amount;
+      }
+
+      return startingBalance + transactionTotal;
+    } catch (e) {
+      print('Error calculating balance: $e');
+      return 0.0;
+    }
+  }
+
   Future<void> _addTask() async {
     if (widget.selectedUserId == null) {
       _showSnackBar('Please select a user first');
@@ -86,10 +120,37 @@ class _AdminScreenState extends State<AdminScreen> {
         return;
       }
 
+      // Determine the final amount based on transaction type
+      double finalAmount = amount;
+      if (_selectedTransactionType == 'Purchase' || _selectedTransactionType == 'Withdrawal') {
+        finalAmount = -amount.abs(); // Make sure purchases and withdrawals are negative
+        
+        // Check if this transaction would make balance negative
+        final currentBalance = await _getCurrentBalance();
+        final newBalance = currentBalance + finalAmount;
+        
+        if (newBalance < 0) {
+          _showSnackBar('Transaction denied: Balance cannot go below ₱0.00. Current balance: ₱${currentBalance.toStringAsFixed(2)}');
+          return;
+        }
+      } else {
+        finalAmount = amount.abs(); // Make sure allowances and deposits are positive
+      }
+
+      // Check if the transaction is valid based on the current balance
+      final currentBalance = await _getCurrentBalance();
+      if (_selectedTransactionType == 'Purchase' || _selectedTransactionType == 'Withdrawal') {
+        // For purchases and withdrawals, ensure the amount does not exceed the current balance
+        if (currentBalance + finalAmount < 0) {
+          _showSnackBar('Insufficient balance for this transaction');
+          return;
+        }
+      }
+
       await FirebaseFirestore.instance.collection('transactions').add({
         'userId': widget.selectedUserId,
         'type': _selectedTransactionType,
-        'amount': amount,
+        'amount': finalAmount,
         'description': _selectedTransactionType == 'Allowance' 
             ? 'Weekly Allowance' 
             : _selectedTransactionType == 'Purchase' 
@@ -142,49 +203,6 @@ class _AdminScreenState extends State<AdminScreen> {
         backgroundColor: AppColors.primary,
       ),
     );
-  }
-
-  double _calculateBalance(List<Map<String, dynamic>> transactions) {
-    double spent = 0.0;
-    double earned = 0.0;
-    
-    for (final tx in transactions) {
-      // Handle both string and numeric amount formats
-      double amount = 0.0;
-      final amountData = tx['amount'];
-      
-      if (amountData is num) {
-        amount = amountData.toDouble();
-      } else if (amountData is String) {
-        // Parse string amounts like "+200" or "-100" or "100"
-        final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
-        amount = double.tryParse(cleanAmount) ?? 0.0;
-        
-        // For old data, positive strings (like "100" or "+100") are earnings
-        // Negative strings (like "-100") are spending
-        if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
-          amount = amount.abs(); // Ensure positive for earnings
-        } else if (amountData.startsWith('-')) {
-          amount = -amount.abs(); // Ensure negative for spending
-        }
-      }
-      
-      final type = tx['type'] as String? ?? '';
-      
-      // Determine if this is earning or spending based on type and amount
-      if (type.toLowerCase().contains('allowance') || 
-          type.toLowerCase().contains('reward') || 
-          type.toLowerCase().contains('deposit') ||
-          amount > 0) {
-        earned += amount.abs();
-      } else if (type.toLowerCase().contains('purchase') || 
-                 type.toLowerCase().contains('withdrawal') ||
-                 amount < 0) {
-        spent += amount.abs();
-      }
-    }
-    
-    return earned - spent;
   }
 
   @override
@@ -743,11 +761,10 @@ class _AdminScreenState extends State<AdminScreen> {
                     
                     final type = tx['type'] as String? ?? '';
                     
-                    // Only count earnings
+                    // Only count earnings based on transaction type
                     if (type.toLowerCase().contains('allowance') || 
                         type.toLowerCase().contains('reward') || 
-                        type.toLowerCase().contains('deposit') ||
-                        amount > 0) {
+                        type.toLowerCase().contains('deposit')) {
                       totalEarned += amount.abs();
                     }
                   }
@@ -801,10 +818,9 @@ class _AdminScreenState extends State<AdminScreen> {
                     
                     final type = tx['type'] as String? ?? '';
                     
-                    // Only count spending
+                    // Only count spending based on transaction type
                     if (type.toLowerCase().contains('purchase') || 
-                        type.toLowerCase().contains('withdrawal') ||
-                        amount < 0) {
+                        type.toLowerCase().contains('withdrawal')) {
                       totalSpent += amount.abs();
                     }
                   }
@@ -922,12 +938,15 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Widget _buildUserBalanceCard() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('transactions')
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: widget.selectedUserId != null 
+          ? FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.selectedUserId)
+              .snapshots()
+          : const Stream.empty(),
+      builder: (context, userSnapshot) {
+        if (!userSnapshot.hasData) {
           return Container(
             height: 140,
             decoration: BoxDecoration(
@@ -944,15 +963,89 @@ class _AdminScreenState extends State<AdminScreen> {
           );
         }
 
-        // Filter transactions by userId - include null/empty for backward compatibility
-        final allTransactions = snapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
-        final transactions = allTransactions.where((tx) => 
-          tx['userId'] == widget.selectedUserId || 
-          tx['userId'] == null || 
-          (tx['userId'] as String?)?.isEmpty == true
-        ).toList();
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('transactions')
+              .snapshots(),
+          builder: (context, txSnapshot) {
+            if (!txSnapshot.hasData) {
+              return Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              );
+            }
 
-        final balance = _calculateBalance(transactions);
+            // Get starting balance from user document
+            final userData = userSnapshot.data?.data() as Map<String, dynamic>? ?? {};
+            final startingBalance = (userData['balance'] as num?)?.toDouble() ?? 500.0;
+
+            // Filter transactions by userId and calculate earned/spent
+            final allTransactions = txSnapshot.data?.docs.map((doc) => doc.data() as Map<String, dynamic>).toList() ?? [];
+            final transactions = allTransactions.where((tx) => 
+              tx['userId'] == widget.selectedUserId || 
+              tx['userId'] == null || 
+              (tx['userId'] as String?)?.isEmpty == true
+            ).toList();
+
+            // Calculate spent and earned amounts from transactions
+            double spent = 0.0;
+            double earned = 0.0;
+            
+            for (final tx in transactions) {
+              // Handle both string and numeric amount formats
+              double amount = 0.0;
+              final amountData = tx['amount'];
+              
+              if (amountData is num) {
+                amount = amountData.toDouble();
+              } else if (amountData is String) {
+                // Parse string amounts like "+200" or "-100" or "100"
+                final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
+                amount = double.tryParse(cleanAmount) ?? 0.0;
+                
+                // For old data, positive strings (like "100" or "+100") are earnings
+                // Negative strings (like "-100") are spending
+                if (amountData.startsWith('+') || (!amountData.startsWith('-') && amount > 0)) {
+                  amount = amount.abs(); // Ensure positive for earnings
+                } else if (amountData.startsWith('-')) {
+                  amount = -amount.abs(); // Ensure negative for spending
+                }
+              }
+              
+              final type = tx['type'] as String? ?? '';
+              
+              // Determine if this is earning or spending based on transaction type
+              if (type.toLowerCase().contains('allowance') || 
+                  type.toLowerCase().contains('reward') || 
+                  type.toLowerCase().contains('deposit')) {
+                // These types always add to balance
+                earned += amount.abs();
+              } else if (type.toLowerCase().contains('purchase') || 
+                         type.toLowerCase().contains('withdrawal')) {
+                // These types always subtract from balance
+                spent += amount.abs();
+              } else {
+                // For unknown types, use the amount sign to determine
+                if (amount > 0) {
+                  earned += amount;
+                } else {
+                  spent += amount.abs();
+                }
+              }
+            }
+
+            // Calculate current balance: Starting balance + earned - spent
+            final balance = startingBalance + earned - spent;
 
         return Container(
           width: double.infinity,
@@ -1058,6 +1151,8 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ],
           ),
+        );
+          },
         );
       },
     );
@@ -2083,13 +2178,48 @@ class _AdminScreenState extends State<AdminScreen> {
                   return _buildEmptyActivityState();
                 }
 
-                return ListView.separated(
-                  itemCount: activities.length > 8 ? 8 : activities.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final activity = activities[index];
-                    return _buildActivityItem(activity);
-                  },
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Activity count indicator
+                    if (activities.length > 5)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: AppColors.primary.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${activities.length} activities • Scroll to see more',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary.withValues(alpha: 0.7),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Scrollable activity list
+                    Expanded(
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: activities.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final activity = activities[index];
+                            return _buildActivityItem(activity);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -2174,14 +2304,12 @@ class _AdminScreenState extends State<AdminScreen> {
   Stream<List<QuerySnapshot>> _getCombinedActivityStream() {
     final tasksStream = FirebaseFirestore.instance
         .collection('tasks')
-        .where('userId', isEqualTo: widget.selectedUserId)
         .orderBy('createdAt', descending: true)
         .limit(10)
         .snapshots();
     
     final transactionsStream = FirebaseFirestore.instance
         .collection('transactions')
-        .where('userId', isEqualTo: widget.selectedUserId)
         .orderBy('timestamp', descending: true)
         .limit(10)
         .snapshots();
@@ -2195,31 +2323,43 @@ class _AdminScreenState extends State<AdminScreen> {
   List<Map<String, dynamic>> _combineActivities(List<QuerySnapshot> snapshots) {
     final List<Map<String, dynamic>> activities = [];
     
-    // Add tasks
+    // Add tasks - filter by userId
     for (var doc in snapshots[0].docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final timestamp = data['createdAt'] as Timestamp?;
-      if (timestamp != null) {
-        activities.add({
-          'type': 'task',
-          'timestamp': timestamp,
-          'data': data,
-          'id': doc.id,
-        });
+      final taskUserId = data['userId'] as String?;
+      
+      // Include tasks with matching userId or null/empty for backward compatibility
+      if (taskUserId == widget.selectedUserId || 
+          taskUserId == null || 
+          taskUserId.isEmpty) {
+        final timestamp = data['createdAt'] as Timestamp?;
+        if (timestamp != null) {
+          activities.add({
+            'type': 'task',
+            'timestamp': timestamp,
+            'data': data,
+            'id': doc.id,
+          });
+        }
       }
     }
     
-    // Add transactions
+    // Add transactions - filter by userId
     for (var doc in snapshots[1].docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final timestamp = data['timestamp'] as Timestamp?;
-      if (timestamp != null) {
-        activities.add({
-          'type': 'transaction',
-          'timestamp': timestamp,
-          'data': data,
-          'id': doc.id,
-        });
+      final txUserId = data['userId'] as String?;
+      
+      // Include transactions with matching userId
+      if (txUserId == widget.selectedUserId) {
+        final timestamp = data['timestamp'] as Timestamp?;
+        if (timestamp != null) {
+          activities.add({
+            'type': 'transaction',
+            'timestamp': timestamp,
+            'data': data,
+            'id': doc.id,
+          });
+        }
       }
     }
     
@@ -2285,7 +2425,12 @@ class _AdminScreenState extends State<AdminScreen> {
       final data = activity['data'] as Map<String, dynamic>;
       final displayName = _getTransactionDisplayName(data);
       final amount = _parseAmount(data['amount']);
-      final isPositive = amount > 0;
+      final type = data['type'] as String? ?? '';
+      
+      // Determine if this is earning or spending based on transaction type
+      final isPositive = type.toLowerCase().contains('allowance') || 
+                        type.toLowerCase().contains('reward') || 
+                        type.toLowerCase().contains('deposit');
       
       return Container(
         padding: const EdgeInsets.all(12),

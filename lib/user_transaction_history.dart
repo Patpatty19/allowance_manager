@@ -751,7 +751,8 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                             ),
                                             child: Text(
                                               tx.type == 'task_reward' ? 'Task Reward' : 
-                                              tx.amount >= 0 ? 'Income' : 'Purchase',
+                                              // Use type to determine proper label
+                                              _getTransactionTypeLabel(tx.type, tx.amount),
                                               style: TextStyle(
                                                 color: tx.amount >= 0 
                                                     ? const Color(0xFF6BAB90)
@@ -770,7 +771,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
-                                                colors: tx.amount >= 0 
+                                                colors: _isPositiveTransaction(tx.type, tx.amount)
                                                     ? [const Color(0xFF6BAB90), const Color(0xFF55917F)]
                                                     : [const Color(0xFFE57373), const Color(0xFFEF5350)],
                                                 begin: Alignment.topLeft,
@@ -779,9 +780,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                               borderRadius: BorderRadius.circular(12),
                                             ),
                                             child: Text(
-                                              tx.amount >= 0 
-                                                  ? '+₱${tx.amount.toStringAsFixed(2)}'
-                                                  : '-₱${tx.amount.abs().toStringAsFixed(2)}',
+                                              _formatTransactionAmount(tx.type, tx.amount),
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 16,
@@ -978,6 +977,63 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
         ),
       ),
     );
+  }
+
+  String _getTransactionTypeLabel(String? type, double amount) {
+    if (type == null) {
+      // Legacy transactions without type - use amount to determine
+      return amount >= 0 ? 'Income' : 'Purchase';
+    }
+    
+    final typeStr = type.toLowerCase();
+    if (typeStr.contains('allowance')) return 'Allowance';
+    if (typeStr.contains('reward')) return 'Reward';
+    if (typeStr.contains('purchase')) return 'Purchase';
+    if (typeStr.contains('withdrawal')) return 'Withdrawal';
+    if (typeStr.contains('deposit')) return 'Deposit';
+    
+    // Fallback for unknown types
+    return amount >= 0 ? 'Income' : 'Purchase';
+  }
+
+  String _formatTransactionAmount(String? type, double amount) {
+    if (type == null) {
+      // Legacy transactions without type - use amount sign
+      return amount >= 0 ? '+₱${amount.toStringAsFixed(2)}' : '-₱${amount.abs().toStringAsFixed(2)}';
+    }
+    
+    final typeStr = type.toLowerCase();
+    if (typeStr.contains('allowance') || 
+        typeStr.contains('reward') || 
+        typeStr.contains('deposit')) {
+      return '+₱${amount.abs().toStringAsFixed(2)}';
+    } else if (typeStr.contains('purchase') || 
+               typeStr.contains('withdrawal')) {
+      return '-₱${amount.abs().toStringAsFixed(2)}';
+    }
+    
+    // Fallback to amount sign
+    return amount >= 0 ? '+₱${amount.toStringAsFixed(2)}' : '-₱${amount.abs().toStringAsFixed(2)}';
+  }
+
+  bool _isPositiveTransaction(String? type, double amount) {
+    if (type == null) {
+      // Legacy transactions without type - use amount sign
+      return amount >= 0;
+    }
+    
+    final typeStr = type.toLowerCase();
+    if (typeStr.contains('allowance') || 
+        typeStr.contains('reward') || 
+        typeStr.contains('deposit')) {
+      return true;
+    } else if (typeStr.contains('purchase') || 
+               typeStr.contains('withdrawal')) {
+      return false;
+    }
+    
+    // Fallback to amount sign
+    return amount >= 0;
   }
 }
 

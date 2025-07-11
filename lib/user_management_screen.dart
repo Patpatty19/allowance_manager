@@ -271,6 +271,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -490,7 +492,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                   ),
                                                   SizedBox(height: 4),
                                                   Text(
-                                                    'Create a profile for your loved one',
+                                                    'Add your family members to manage their allowances',
                                                     style: TextStyle(
                                                       fontSize: 15,
                                                       color: Colors.white70,
@@ -659,7 +661,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                 ),
                               ),
                             ),
-                          );
+                            );
                         },
                       ),
                       
@@ -1005,7 +1007,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                                             ),
                                                                             const SizedBox(width: 6),
                                                                             Text(
-                                                                              '₱${user['balance'] ?? 500}',
+                                                                              '₱${user['balance']?.toString() ?? '0'}',
                                                                               style: const TextStyle(
                                                                                 fontWeight: FontWeight.bold,
                                                                                 color: Colors.white,
@@ -1048,7 +1050,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                 ),
                               ),
                             ),
-                          );
+                            );
                         },
                       ),
                       
