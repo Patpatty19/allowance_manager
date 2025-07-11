@@ -7,17 +7,27 @@ import 'main_menu_screen.dart'; // Import MainMenuScreen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase for all platforms (Windows, Web, Mobile)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  // Register extensions to ensure they're loaded
+
+  // ✅ This is the safest way to avoid crash from duplicate app initialization
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app') {
+      // Firebase is already initialized, continue safely
+    } else {
+      rethrow; // If it's another Firebase error, we let it crash to catch it
+    }
+  } catch (e) {
+    // Any other unexpected error
+    debugPrint('Unexpected error initializing Firebase: $e');
+  }
+
   registerExtensions();
-  
   runApp(const MainApp());
 }
+
 
 class MainApp extends StatelessWidget {
   const MainApp({super.key});
