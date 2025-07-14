@@ -291,7 +291,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           children: [
             // Custom Enhanced Header
             Container(
-              padding: const EdgeInsets.fromLTRB(24, 50, 24, 30),
+              padding: const EdgeInsets.fromLTRB(16, 50, 16, 20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
@@ -299,15 +299,15 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(35),
-                  bottomRight: Radius.circular(35),
+                  bottomLeft: Radius.circular(25),
+                  bottomRight: Radius.circular(25),
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 25,
-                    offset: const Offset(0, 10),
-                    spreadRadius: 2,
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: 1,
                   ),
                 ],
               ),
@@ -339,16 +339,15 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                 color: Colors.white.withValues(alpha: 0.3),
                                 width: 1,
                               ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_back_ios_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
+                            ),                          child: const Icon(
+                            Icons.arrow_back_ios_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 15),
                       // Title Section
                       Expanded(
                         child: Column(
@@ -357,7 +356,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                             Row(
                               children: [
                                 Container(
-                                  padding: const EdgeInsets.all(10),
+                                  padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: Colors.white.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(12),
@@ -365,27 +364,33 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                   child: const Icon(
                                     Icons.family_restroom_rounded,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: 20,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Family Management',
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                const SizedBox(width: 10),
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: const Text(
+                                    'Family Management',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            const Text(
-                              'Add & manage family members',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w500,
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: const Text(
+                                'Add & manage family members',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
@@ -402,7 +407,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
                       const SizedBox(height: 8),
@@ -430,9 +435,9 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                   ],
                                 ),
                                 child: Container(
-                                  padding: const EdgeInsets.all(32),
+                                  padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(30),
+                                    borderRadius: BorderRadius.circular(25),
                                     gradient: LinearGradient(
                                       colors: [
                                         Colors.white,
@@ -447,14 +452,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                     children: [
                                       // Form Header
                                       Container(
-                                        padding: const EdgeInsets.all(24),
+                                        padding: const EdgeInsets.all(18),
                                         decoration: BoxDecoration(
                                           gradient: const LinearGradient(
                                             colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                           ),
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: BorderRadius.circular(18),
                                           boxShadow: [
                                             BoxShadow(
                                               color: const Color(0xFF6BAB90).withValues(alpha: 0.4),
@@ -466,37 +471,43 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                         child: Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.all(14),
+                                              padding: const EdgeInsets.all(12),
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withValues(alpha: 0.25),
-                                                borderRadius: BorderRadius.circular(14),
+                                                borderRadius: BorderRadius.circular(12),
                                               ),
                                               child: const Icon(
                                                 Icons.person_add_alt_1_rounded,
                                                 color: Colors.white,
-                                                size: 32,
+                                                size: 28,
                                               ),
                                             ),
-                                            const SizedBox(width: 18),
+                                            const SizedBox(width: 15),
                                             const Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(
-                                                    'Add New Family Member',
-                                                    style: TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.white,
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      'Add New Family Member',
+                                                      style: TextStyle(
+                                                        fontSize: 20,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.white,
+                                                      ),
                                                     ),
                                                   ),
                                                   SizedBox(height: 4),
-                                                  Text(
-                                                    'Add your family members to manage their allowances',
-                                                    style: TextStyle(
-                                                      fontSize: 15,
-                                                      color: Colors.white70,
-                                                      fontWeight: FontWeight.w500,
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      'Add your family members to manage their allowances',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: Colors.white70,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -506,7 +517,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                         ),
                                       ),
                                       
-                                      const SizedBox(height: 32),
+                                      const SizedBox(height: 24),
                                       
                                       // Form Fields
                                       _buildEnhancedTextField(
@@ -679,7 +690,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(30),
+                                  borderRadius: BorderRadius.circular(25),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withValues(alpha: 0.12),
@@ -690,9 +701,9 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                   ],
                                 ),
                                 child: Container(
-                                  padding: const EdgeInsets.all(32),
+                                  padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(30),
+                                    borderRadius: BorderRadius.circular(25),
                                     gradient: LinearGradient(
                                       colors: [
                                         Colors.white,
@@ -707,14 +718,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                     children: [
                                       // Section Header
                                       Container(
-                                        padding: const EdgeInsets.all(20),
+                                        padding: const EdgeInsets.all(16),
                                         decoration: BoxDecoration(
                                           gradient: const LinearGradient(
                                             colors: [Color(0xFF55917F), Color(0xFF6BAB90)],
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                           ),
-                                          borderRadius: BorderRadius.circular(18),
+                                          borderRadius: BorderRadius.circular(15),
                                           boxShadow: [
                                             BoxShadow(
                                               color: const Color(0xFF55917F).withValues(alpha: 0.3),
@@ -726,35 +737,41 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                         child: Row(
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.all(12),
+                                              padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withValues(alpha: 0.25),
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius: BorderRadius.circular(10),
                                               ),
                                               child: const Icon(
                                                 Icons.people_rounded,
                                                 color: Colors.white,
-                                                size: 28,
+                                                size: 24,
                                               ),
                                             ),
-                                            const SizedBox(width: 16),
+                                            const SizedBox(width: 12),
                                             const Expanded(
                                               child: Column(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(
-                                                    'Family Members',
-                                                    style: TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Colors.white,
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      'Family Members',
+                                                      style: TextStyle(
+                                                        fontSize: 20,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.white,
+                                                      ),
                                                     ),
                                                   ),
-                                                  Text(
-                                                    'Manage existing family members',
-                                                    style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.white70,
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      'Manage existing family members',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        color: Colors.white70,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -764,7 +781,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                         ),
                                       ),
                                       
-                                      const SizedBox(height: 24),
+                                      const SizedBox(height: 20),
                                       
                                       // Users List
                                       StreamBuilder<QuerySnapshot>(
@@ -821,7 +838,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                           
                                           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                                             return Container(
-                                              padding: const EdgeInsets.all(40),
+                                              padding: const EdgeInsets.all(30),
                                               child: Column(
                                                 children: [
                                                   TweenAnimationBuilder<double>(
@@ -831,7 +848,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                       return Transform.scale(
                                                         scale: value,
                                                         child: Container(
-                                                          padding: const EdgeInsets.all(24),
+                                                          padding: const EdgeInsets.all(20),
                                                           decoration: BoxDecoration(
                                                             color: const Color(0xFF6BAB90).withValues(alpha: 0.1),
                                                             shape: BoxShape.circle,
@@ -842,31 +859,37 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                           ),
                                                           child: const Icon(
                                                             Icons.family_restroom_rounded,
-                                                            size: 56,
+                                                            size: 48,
                                                             color: Color(0xFF6BAB90),
                                                           ),
                                                         ),
                                                       );
                                                     },
                                                   ),
-                                                  const SizedBox(height: 24),
-                                                  const Text(
-                                                    'No Family Members Yet',
-                                                    style: TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight: FontWeight.bold,
-                                                      color: Color(0xFF5E4C5A),
+                                                  const SizedBox(height: 20),
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: const Text(
+                                                      'No Family Members Yet',
+                                                      style: TextStyle(
+                                                        fontSize: 20,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFF5E4C5A),
+                                                      ),
                                                     ),
                                                   ),
-                                                  const SizedBox(height: 12),
-                                                  const Text(
-                                                    'Add your first family member above to get started with PayGoal!',
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      color: Color(0xFF55917F),
-                                                      height: 1.5,
+                                                  const SizedBox(height: 10),
+                                                  FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: const Text(
+                                                      'Add your first family member above to get started with PayGoal!',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: Color(0xFF55917F),
+                                                        height: 1.5,
+                                                      ),
+                                                      textAlign: TextAlign.center,
                                                     ),
-                                                    textAlign: TextAlign.center,
                                                   ),
                                                 ],
                                               ),
@@ -891,10 +914,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                     child: Opacity(
                                                       opacity: animValue,
                                                       child: Container(
-                                                        margin: const EdgeInsets.only(bottom: 16),
+                                                        margin: const EdgeInsets.only(bottom: 12),
                                                         decoration: BoxDecoration(
                                                           color: Colors.white,
-                                                          borderRadius: BorderRadius.circular(22),
+                                                          borderRadius: BorderRadius.circular(18),
                                                           boxShadow: [
                                                             BoxShadow(
                                                               color: Colors.black.withValues(alpha: 0.08),
@@ -906,7 +929,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                         child: Material(
                                                           color: Colors.transparent,
                                                           child: InkWell(
-                                                            borderRadius: BorderRadius.circular(22),
+                                                            borderRadius: BorderRadius.circular(18),
                                                             onTap: () {
                                                               Navigator.pop(context, {
                                                                 'id': userId,
@@ -916,19 +939,19 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                               });
                                                             },
                                                             child: Container(
-                                                              padding: const EdgeInsets.all(20),
+                                                              padding: const EdgeInsets.all(16),
                                                               child: Row(
                                                                 children: [
                                                                   // Avatar
                                                                   Container(
-                                                                    padding: const EdgeInsets.all(18),
+                                                                    padding: const EdgeInsets.all(14),
                                                                     decoration: BoxDecoration(
                                                                       gradient: const LinearGradient(
                                                                         colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
                                                                         begin: Alignment.topLeft,
                                                                         end: Alignment.bottomRight,
                                                                       ),
-                                                                      borderRadius: BorderRadius.circular(18),
+                                                                      borderRadius: BorderRadius.circular(15),
                                                                       boxShadow: [
                                                                         BoxShadow(
                                                                           color: const Color(0xFF6BAB90).withValues(alpha: 0.3),
@@ -940,42 +963,47 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                                     child: Text(
                                                                       user['name']?.substring(0, 1).toUpperCase() ?? 'U',
                                                                       style: const TextStyle(
-                                                                        fontSize: 22,
+                                                                        fontSize: 20,
                                                                         fontWeight: FontWeight.bold,
                                                                         color: Colors.white,
                                                                       ),
                                                                     ),
                                                                   ),
-                                                                  const SizedBox(width: 20),
+                                                                  const SizedBox(width: 15),
                                                                   
                                                                   // User Info
                                                                   Expanded(
                                                                     child: Column(
                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                       children: [
-                                                                        Text(
-                                                                          user['name'] ?? 'Unknown',
-                                                                          style: const TextStyle(
-                                                                            fontSize: 20,
-                                                                            fontWeight: FontWeight.bold,
-                                                                            color: Color(0xFF5E4C5A),
+                                                                        FittedBox(
+                                                                          fit: BoxFit.scaleDown,
+                                                                          child: Text(
+                                                                            user['name'] ?? 'Unknown',
+                                                                            style: const TextStyle(
+                                                                              fontSize: 18,
+                                                                              fontWeight: FontWeight.bold,
+                                                                              color: Color(0xFF5E4C5A),
+                                                                            ),
                                                                           ),
                                                                         ),
-                                                                        const SizedBox(height: 6),
+                                                                        const SizedBox(height: 4),
                                                                         Row(
                                                                           children: [
                                                                             Icon(
                                                                               Icons.email_rounded,
-                                                                              size: 16,
+                                                                              size: 14,
                                                                               color: Colors.grey.withValues(alpha: 0.6),
                                                                             ),
                                                                             const SizedBox(width: 6),
-                                                                            Text(
-                                                                              user['email'] ?? 'No email',
-                                                                              style: TextStyle(
-                                                                                fontSize: 14,
-                                                                                color: Colors.grey.withValues(alpha: 0.8),
-                                                                                fontWeight: FontWeight.w500,
+                                                                            Expanded(
+                                                                              child: Text(
+                                                                                user['email'] ?? 'No email',
+                                                                                style: TextStyle(
+                                                                                  fontSize: 12,
+                                                                                  color: Colors.grey.withValues(alpha: 0.8),
+                                                                                ),
+                                                                                overflow: TextOverflow.ellipsis,
                                                                               ),
                                                                             ),
                                                                           ],
@@ -988,14 +1016,14 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                                   Column(
                                                                     children: [
                                                                       Container(
-                                                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                                                         decoration: BoxDecoration(
                                                                           gradient: const LinearGradient(
                                                                             colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
                                                                             begin: Alignment.topLeft,
                                                                             end: Alignment.bottomRight,
                                                                           ),
-                                                                          borderRadius: BorderRadius.circular(20),
+                                                                          borderRadius: BorderRadius.circular(15),
                                                                         ),
                                                                         child: Row(
                                                                           mainAxisSize: MainAxisSize.min,
@@ -1003,30 +1031,34 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                                                                             const Icon(
                                                                               Icons.account_balance_wallet_rounded,
                                                                               color: Colors.white,
-                                                                              size: 18,
+                                                                              size: 16,
                                                                             ),
-                                                                            const SizedBox(width: 6),
-                                                                            Text(
-                                                                              '₱${user['balance']?.toString() ?? '0'}',
-                                                                              style: const TextStyle(
-                                                                                fontWeight: FontWeight.bold,
-                                                                                color: Colors.white,
-                                                                                fontSize: 16,
+                                                                            const SizedBox(width: 4),
+                                                                            FittedBox(
+                                                                              fit: BoxFit.scaleDown,
+                                                                              child: Text(
+                                                                                '₱${user['balance']?.toString() ?? '0'}',
+                                                                                style: const TextStyle(
+                                                                                  fontWeight: FontWeight.bold,
+                                                                                  color: Colors.white,
+                                                                                  fontSize: 14,
+                                                                                ),
                                                                               ),
                                                                             ),
                                                                           ],
                                                                         ),
                                                                       ),
-                                                                      const SizedBox(height: 12),
+                                                                      const SizedBox(height: 8),
                                                                       Container(
                                                                         decoration: BoxDecoration(
                                                                           color: Colors.red.withValues(alpha: 0.1),
-                                                                          borderRadius: BorderRadius.circular(10),
+                                                                          borderRadius: BorderRadius.circular(8),
                                                                         ),
                                                                         child: IconButton(
                                                                           icon: const Icon(Icons.delete_rounded, color: Colors.red),
                                                                           onPressed: () => _deleteUser(userId),
-                                                                          iconSize: 22,
+                                                                          iconSize: 20,
+                                                                          padding: const EdgeInsets.all(8),
                                                                         ),
                                                                       ),
                                                                     ],
@@ -1077,7 +1109,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   }) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -1092,7 +1124,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         obscureText: isPassword,
         maxLength: maxLength,
         style: const TextStyle(
-          fontSize: 16,
+          fontSize: 14,
           color: Color(0xFF5E4C5A),
           fontWeight: FontWeight.w500,
         ),
@@ -1100,8 +1132,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           labelText: label,
           hintText: hint,
           prefixIcon: Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(10),
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -1111,30 +1143,30 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
               color: const Color(0xFF6BAB90),
-              size: 22,
+              size: 20,
             ),
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide(
               color: Colors.grey.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide(
               color: Colors.grey.withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(15),
             borderSide: const BorderSide(
               color: Color(0xFF6BAB90),
               width: 2.5,

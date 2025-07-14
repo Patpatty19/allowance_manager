@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'responsive_scaler.dart';
 
 class UserTransactionHistoryScreen extends StatefulWidget {
   final String? userId;
@@ -416,7 +417,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Container(
-        height: 90,
+        height: context.scaleDimension(100),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [
@@ -428,22 +429,22 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
             end: Alignment.bottomRight,
             stops: [0.0, 0.6, 1.0],
           ),
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(35),
-            bottomRight: Radius.circular(35),
+          borderRadius: BorderRadius.only(
+            bottomLeft: Radius.circular(context.scaleSpacing(12)),
+            bottomRight: Radius.circular(context.scaleSpacing(12)),
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF6BAB90).withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-              spreadRadius: 2,
+              color: const Color(0xFF6BAB90).withValues(alpha: 0.2),
+              blurRadius: context.scaleSpacing(6),
+              offset: Offset(0, context.scaleSpacing(2)),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+            padding: RPadding.fromLTRB(context, 10, 2, 8, 2),
             child: Row(
               children: [
                 // Back button
@@ -456,22 +457,22 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(context.scaleSpacing(8)),
                           onTap: () => Navigator.pop(context),
                           child: Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: RPadding.all(context, 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(context.scaleSpacing(6)),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.3),
+                                color: Colors.white.withValues(alpha: 0.25),
                                 width: 1,
                               ),
                             ),
-                            child: const Icon(
+                            child: RIcon(
                               Icons.arrow_back_ios_rounded,
+                              size: 12,
                               color: Colors.white,
-                              size: 20,
                             ),
                           ),
                         ),
@@ -479,7 +480,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     );
                   },
                 ),
-                const SizedBox(width: 16),
+                RSpacing.width(6),
                 
                 // Title section
                 Expanded(
@@ -491,25 +492,31 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                         offset: Offset(30 * (1 - value), 0),
                         child: Opacity(
                           opacity: value,
-                          child: const Column(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                'Transaction History',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: RText(
+                                  'Transaction History',
+                                  fontSize: 18,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
                                 ),
                               ),
-                              Text(
-                                'Track your spending',
-                                style: TextStyle(
-                                  color: Color(0xFFE1F0C4),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: RText(
+                                  'Track your spending',
+                                  fontSize: 12,
+                                  style: TextStyle(
+                                    color: Color(0xFFE1F0C4),
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
@@ -528,12 +535,12 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                     return Transform.scale(
                       scale: value,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: RPadding.symmetric(context, horizontal: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.25),
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(context.scaleSpacing(6)),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
+                            color: Colors.white.withValues(alpha: 0.15),
                             width: 1,
                           ),
                         ),
@@ -541,27 +548,30 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                           value: _sortOrder,
                           dropdownColor: const Color(0xFFE1F0C4),
                           underline: Container(),
-                          icon: const Icon(Icons.sort_rounded, color: Colors.white, size: 20),
-                          items: const [
+                            icon: RIcon(Icons.sort_rounded, size: 12, color: Colors.white),
+                          items: [
                             DropdownMenuItem(
                               value: 'latest', 
-                              child: Text(
+                              child: RText(
                                 'Latest',
-                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w500),
+                                fontSize: 9,
+                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w800),
                               ),
                             ),
                             DropdownMenuItem(
                               value: 'desc', 
-                              child: Text(
-                                'High to Low',
-                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w500),
+                              child: RText(
+                                'High→Low',
+                                fontSize: 9,
+                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w800),
                               ),
                             ),
                             DropdownMenuItem(
                               value: 'asc', 
-                              child: Text(
-                                'Low to High',
-                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w500),
+                              child: RText(
+                                'Low→High',
+                                fontSize: 9,
+                                style: TextStyle(color: Color(0xFF5E4C5A), fontWeight: FontWeight.w800),
                               ),
                             ),
                           ],
@@ -587,40 +597,42 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: widget.userId == null 
-          ? const Center(child: Text('No user selected'))
-          : Column(
-              children: [
-                // Enhanced header
-                _buildAnimatedHeader(),
-                
-                // Main content area
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('transactions')
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6BAB90)),
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
-                      
-                      // Filter transactions to include null/empty userId for backward compatibility
-                      var allTransactions = snapshot.data?.docs ?? [];
-                      var filteredTransactions = allTransactions.where((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        final userId = data['userId'];
-                        return userId == widget.userId || 
-                               userId == null || 
+    return ResponsiveScaler(
+      maxWidth: null,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        body: widget.userId == null 
+            ? const Center(child: Text('No user selected'))
+            : Column(
+                children: [
+                  // Enhanced header
+                  _buildAnimatedHeader(),
+                  
+                  // Main content area
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('transactions')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6BAB90)),
+                            ),
+                          );
+                        }
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Error: ${snapshot.error}'));
+                        }
+                        
+                        // Filter transactions to include null/empty userId for backward compatibility
+                        var allTransactions = snapshot.data?.docs ?? [];
+                        var filteredTransactions = allTransactions.where((doc) {
+                          final data = doc.data() as Map<String, dynamic>;
+                          final userId = data['userId'];
+                          return userId == widget.userId || 
+                                 userId == null || 
                                (userId as String?)?.isEmpty == true;
                       }).toList();
                       
@@ -640,8 +652,8 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                           opacity: _fadeAnimation,
                           child: Center(
                             child: Container(
-                              margin: const EdgeInsets.all(40),
-                              padding: const EdgeInsets.all(40),
+                              margin: const EdgeInsets.all(20),
+                              padding: const EdgeInsets.all(30),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
@@ -668,7 +680,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(20),
+                                    padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
@@ -682,30 +694,36 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                     ),
                                     child: Icon(
                                       Icons.receipt_long_rounded,
-                                      size: 80,
+                                      size: 60,
                                       color: const Color(0xFF6BAB90).withValues(alpha: 0.6),
                                     ),
                                   ),
-                                  const SizedBox(height: 24),
-                                  Text(
-                                    'No transactions yet! 💸',
-                                    style: TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF5E4C5A).withValues(alpha: 0.8),
-                                      letterSpacing: 0.5,
+                                  const SizedBox(height: 20),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'No transactions yet! 💸',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF5E4C5A).withValues(alpha: 0.8),
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 12),
-                                  Text(
-                                    'Start tracking your spending by\nadding your first transaction!',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: const Color(0xFF5E4C5A).withValues(alpha: 0.6),
-                                      height: 1.5,
-                                      letterSpacing: 0.3,
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      'Start tracking your spending by\nadding your first transaction!',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: const Color(0xFF5E4C5A).withValues(alpha: 0.6),
+                                        height: 1.5,
+                                        letterSpacing: 0.3,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                    textAlign: TextAlign.center,
                                   ),
                                 ],
                               ),
@@ -715,7 +733,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                       }
                       
                       return ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
                         itemCount: transactions.length,
                         itemBuilder: (context, index) {
                           final tx = transactions[index];
@@ -728,7 +746,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                 child: Opacity(
                                   opacity: animValue,
                                   child: Container(
-                                    margin: const EdgeInsets.symmetric(vertical: 8),
+                                    margin: const EdgeInsets.symmetric(vertical: 6),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
@@ -740,7 +758,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       ),
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
                                         color: tx.amount >= 0 
                                             ? const Color(0xFF6BAB90).withValues(alpha: 0.2)
@@ -762,9 +780,9 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                       ],
                                     ),
                                     child: ListTile(
-                                      contentPadding: const EdgeInsets.all(20),
+                                      contentPadding: const EdgeInsets.all(16),
                                       leading: Container(
-                                        padding: const EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: tx.amount >= 0 
@@ -896,10 +914,7 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
                                                   ),
                                                 );
                                                 if (confirm == true) {
-                                                  await FirebaseFirestore.instance
-                                                      .collection('transactions')
-                                                      .doc(tx.id)
-                                                      .delete();
+                                                  await _deleteTransactionAndResetTask(tx);
                                                 }
                                               },
                                               child: Container(
@@ -968,74 +983,107 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
           );
         },
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF6BAB90), Color(0xFF55917F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF6BAB90),
+              Color(0xFF55917F),
+              Color(0xFF4A7A69),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            stops: [0.0, 0.5, 1.0],
+          ),
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6BAB90).withValues(alpha: 0.3),
+              blurRadius: 15,
+              offset: const Offset(0, -6),
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Container(
+            height: 75,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildNavButton(
+                  icon: Icons.home_rounded,
+                  label: 'Home',
+                  isActive: false,
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                _buildNavButton(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'History',
+                  isActive: true,
+                  onTap: () {},
+                ),
+                _buildNavButton(
+                  icon: Icons.logout_rounded,
+                  label: 'Exit',
+                  isActive: false,
+                  onTap: () {
+                    Navigator.popUntil(context, (route) => route.isFirst);
+                  },
+                ),
+              ],
             ),
           ),
-          height: 80,
-          width: double.infinity,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    icon: const Icon(Icons.home),
-                    color: Colors.white,
-                    iconSize: 32,
-                    tooltip: 'Home',
-                  ),
-                  const Text(
-                    'Home',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
+        ),
+      ),
+      ), // ResponsiveScaler closing
+    );
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive 
+              ? Colors.white.withValues(alpha: 0.25)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: isActive
+              ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1)
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: isActive ? 30 : 30,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isActive ? 11 : 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0.2,
               ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.receipt_long),
-                    color: Colors.white,
-                    iconSize: 32,
-                    tooltip: 'Transactions',
-                  ),
-                  const Text(
-                    'Transactions',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
-              ),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.popUntil(context, (route) => route.isFirst);
-                    },
-                    icon: const Icon(Icons.exit_to_app),
-                    color: Colors.white,
-                    iconSize: 36,
-                    tooltip: 'Exit',
-                  ),
-                  const Text(
-                    'Exit',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1096,6 +1144,57 @@ class _UserTransactionHistoryScreenState extends State<UserTransactionHistoryScr
     
     // Fallback to amount sign
     return amount >= 0;
+  }
+
+  Future<void> _deleteTransactionAndResetTask(_Transaction transaction) async {
+    try {
+      // Delete the transaction
+      await FirebaseFirestore.instance
+          .collection('transactions')
+          .doc(transaction.id)
+          .delete();
+
+      // If this was a task reward transaction, reset the related task
+      if (transaction.type == 'Task Reward' && transaction.name.startsWith('Task Completed:')) {
+        final taskTitle = transaction.name.replaceFirst('Task Completed: ', '');
+        
+        // Find the related task and reset its completion status
+        final tasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: widget.userId)
+            .get();
+        
+        // Also check for tasks without userId (global tasks)
+        final globalTasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: null)
+            .get();
+            
+        final emptyUserIdTasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: '')
+            .get();
+
+        // Reset all matching tasks
+        final allTaskDocs = [
+          ...tasksQuery.docs,
+          ...globalTasksQuery.docs,
+          ...emptyUserIdTasksQuery.docs,
+        ];
+
+        for (final taskDoc in allTaskDocs) {
+          await taskDoc.reference.update({
+            'completed': false,
+            'isCompleted': false,
+          });
+        }
+      }
+    } catch (e) {
+      print('Error deleting transaction and resetting task: $e');
+    }
   }
 }
 

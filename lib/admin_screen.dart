@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app_colors.dart';
+import 'responsive_scaler.dart';
 
 class AdminScreen extends StatefulWidget {
   final String? selectedUserId;
@@ -174,10 +175,32 @@ class _AdminScreenState extends State<AdminScreen> {
       final taskDoc = await FirebaseFirestore.instance.collection('tasks').doc(taskId).get();
       final taskData = taskDoc.data();
       final taskName = taskData?['taskName'] as String? ?? taskData?['title'] as String? ?? 'Task';
+      final isAlreadyCompleted = taskData?['isCompleted'] as bool? ?? taskData?['completed'] as bool? ?? false;
       
-      // Mark task as completed
+      // If already completed, don't create duplicate transaction
+      if (isAlreadyCompleted) {
+        _showSnackBar('Task is already completed!');
+        return;
+      }
+      
+      // Check if transaction already exists to prevent duplicates
+      final existingTransaction = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('userId', isEqualTo: widget.selectedUserId)
+          .where('type', isEqualTo: 'Task Reward')
+          .where('description', isEqualTo: 'Task Completed: $taskName')
+          .limit(1)
+          .get();
+      
+      if (existingTransaction.docs.isNotEmpty) {
+        _showSnackBar('Transaction already exists for this task!');
+        return;
+      }
+      
+      // Mark task as completed (update both fields for compatibility)
       await FirebaseFirestore.instance.collection('tasks').doc(taskId).update({
         'isCompleted': true,
+        'completed': true,
         'completedAt': FieldValue.serverTimestamp(),
       });
 
@@ -196,6 +219,82 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Future<void> _deleteTaskAndTransactions(String taskId, String taskName) async {
+    try {
+      // Delete the task
+      await FirebaseFirestore.instance.collection('tasks').doc(taskId).delete();
+      
+      // Find and delete all related transactions
+      final transactionsQuery = await FirebaseFirestore.instance
+          .collection('transactions')
+          .where('description', isEqualTo: 'Task Completed: $taskName')
+          .where('type', isEqualTo: 'Task Reward')
+          .get();
+      
+      // Delete all matching transactions
+      for (final transactionDoc in transactionsQuery.docs) {
+        await transactionDoc.reference.delete();
+      }
+      
+      _showSnackBar('Task and related transactions deleted successfully!');
+    } catch (e) {
+      _showSnackBar('Error deleting task: $e');
+    }
+  }
+
+  Future<void> _deleteTransactionAndResetTask(String transactionId, Map<String, dynamic> transactionData) async {
+    try {
+      // Delete the transaction
+      await FirebaseFirestore.instance.collection('transactions').doc(transactionId).delete();
+      
+      // If this was a task reward transaction, reset the related task
+      final type = transactionData['type'] as String? ?? '';
+      final description = transactionData['description'] as String? ?? '';
+      
+      if (type == 'Task Reward' && description.startsWith('Task Completed:')) {
+        final taskTitle = description.replaceFirst('Task Completed: ', '');
+        
+        // Find the related task and reset its completion status
+        final tasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: widget.selectedUserId)
+            .get();
+        
+        // Also check for tasks without userId (global tasks)
+        final globalTasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: null)
+            .get();
+            
+        final emptyUserIdTasksQuery = await FirebaseFirestore.instance
+            .collection('tasks')
+            .where('title', isEqualTo: taskTitle)
+            .where('userId', isEqualTo: '')
+            .get();
+
+        // Reset all matching tasks
+        final allTaskDocs = [
+          ...tasksQuery.docs,
+          ...globalTasksQuery.docs,
+          ...emptyUserIdTasksQuery.docs,
+        ];
+
+        for (final taskDoc in allTaskDocs) {
+          await taskDoc.reference.update({
+            'completed': false,
+            'isCompleted': false,
+          });
+        }
+      }
+      
+      _showSnackBar('Transaction deleted successfully!');
+    } catch (e) {
+      _showSnackBar('Error deleting transaction: $e');
+    }
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -207,74 +306,77 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: widget.selectedUserId == null ? null : AppBar(
-        leading: IconButton(
-          onPressed: () {
-            // Custom back behavior - go to user selection instead of logging out
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminScreen(),
-              ),
-            );
-          },
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          tooltip: 'Back to User Selection',
-        ),
-        title: Text(
-          'Managing ${widget.selectedUserName}',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        actions: [
-          if (widget.selectedUserId != null)
-            IconButton(
-              onPressed: () async {
-                final result = await Navigator.pushNamed(context, '/userManagement');
-                if (result != null && result is Map<String, dynamic>) {
-                  // Navigate to admin screen with selected user
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AdminScreen(
-                        selectedUserId: result['id'],
-                        selectedUserName: result['name'],
-                      ),
-                    ),
-                  );
-                }
-              },
-              icon: const Icon(Icons.switch_account, color: Colors.white),
-              tooltip: 'Switch User',
-            ),
-          IconButton(
+    return ResponsiveScaler(
+      maxWidth: null, // Remove width constraint for full-screen on desktop
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: widget.selectedUserId == null ? null : AppBar(
+          leading: IconButton(
             onPressed: () {
-              Navigator.pushReplacementNamed(context, '/');
+              // Custom back behavior - go to user selection instead of logging out
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminScreen(),
+                ),
+              );
             },
-            icon: const Icon(Icons.logout, color: Colors.white),
-            tooltip: 'Logout',
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            tooltip: 'Back to User Selection',
           ),
-        ],
+          title: Text(
+            'Managing ${widget.selectedUserName}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          actions: [
+            if (widget.selectedUserId != null)
+              IconButton(
+                onPressed: () async {
+                  final result = await Navigator.pushNamed(context, '/userManagement');
+                  if (result != null && result is Map<String, dynamic>) {
+                    // Navigate to admin screen with selected user
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AdminScreen(
+                          selectedUserId: result['id'],
+                          selectedUserName: result['name'],
+                        ),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.switch_account, color: Colors.white),
+                tooltip: 'Switch User',
+              ),
+            IconButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/');
+              },
+              icon: const Icon(Icons.logout, color: Colors.white),
+              tooltip: 'Logout',
+            ),
+          ],
+        ),
+        body: widget.selectedUserId == null
+            ? _buildUserSelectionPrompt()
+            : _buildDashboard(),
+        floatingActionButton: widget.selectedUserId == null ? FloatingActionButton(
+          onPressed: () {
+            Navigator.pushReplacementNamed(context, '/');
+          },
+          backgroundColor: AppColors.error,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          child: const Icon(Icons.logout, size: 24),
+          tooltip: 'Logout',
+        ) : null,
       ),
-      body: widget.selectedUserId == null
-          ? _buildUserSelectionPrompt()
-          : _buildDashboard(),
-      floatingActionButton: widget.selectedUserId == null ? FloatingActionButton(
-        onPressed: () {
-          Navigator.pushReplacementNamed(context, '/');
-        },
-        backgroundColor: AppColors.error,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.logout, size: 24),
-        tooltip: 'Logout',
-      ) : null,
     );
   }
 
@@ -292,7 +394,7 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: RPadding.all(context, 24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -300,8 +402,8 @@ class _AdminScreenState extends State<AdminScreen> {
               
               // Professional admin icon
               Container(
-                width: 120,
-                height: 120,
+                width: context.scaleDimension(120),
+                height: context.scaleDimension(120),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -315,50 +417,49 @@ class _AdminScreenState extends State<AdminScreen> {
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+                      blurRadius: context.scaleSpacing(20),
+                      offset: Offset(0, context.scaleSpacing(10)),
                     ),
                   ],
                 ),
-                child: Icon(
+                child: RIcon(
                   Icons.admin_panel_settings,
                   size: 60,
                   color: Colors.white,
                 ),
               ),
               
-              const SizedBox(height: 32),
+              RSpacing.height(32),
               
               // Professional welcome
-              Text(
+              RText(
                 'Admin Dashboard',
+                fontSize: 32,
                 style: TextStyle(
-                  fontSize: 32,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textDark,
                   letterSpacing: -0.5,
                 ),
-                textAlign: TextAlign.center,
               ),
               
-              const SizedBox(height: 16),
+              RSpacing.height(16),
               
-              Text(
+              RText(
                 'Select a user to manage their goals and tasks',
+                fontSize: 18,
                 style: TextStyle(
-                  fontSize: 18,
                   color: AppColors.textDark.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
               ),
               
-              const SizedBox(height: 48),
+              RSpacing.height(48),
               
               // Professional action button
               Container(
                 width: double.infinity,
-                height: 60,
+                height: context.scaleDimension(60),
                 child: ElevatedButton(
                   onPressed: () async {
                     final result = await Navigator.pushNamed(context, '/userManagement');
@@ -380,23 +481,23 @@ class _AdminScreenState extends State<AdminScreen> {
                     elevation: 8,
                     shadowColor: AppColors.primary.withValues(alpha: 0.3),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(context.scaleSpacing(16)),
                     ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.people, size: 24),
-                      const SizedBox(width: 12),
-                      Text(
+                      RIcon(Icons.people, size: 24),
+                      RSpacing.width(12),
+                      RText(
                         'Select User',
+                        fontSize: 18,
                         style: TextStyle(
-                          fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Icon(Icons.arrow_forward, size: 20),
+                      RSpacing.width(12),
+                      RIcon(Icons.arrow_forward, size: 20),
                     ],
                   ),
                 ),
@@ -406,10 +507,10 @@ class _AdminScreenState extends State<AdminScreen> {
               
               // Professional footer
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: RPadding.symmetric(context, horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(context.scaleSpacing(12)),
                   border: Border.all(
                     color: AppColors.primary.withValues(alpha: 0.2),
                   ),
@@ -417,16 +518,16 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    RIcon(
                       Icons.info_outline,
                       size: 18,
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 8),
-                    Text(
+                    RSpacing.width(8),
+                    RText(
                       'PayGoal Family Management System',
+                      fontSize: 14,
                       style: TextStyle(
-                        fontSize: 14,
                         color: AppColors.textDark.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w500,
                       ),
@@ -435,7 +536,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 ),
               ),
               
-              const SizedBox(height: 20),
+              RSpacing.height(20),
             ],
           ),
         ),
@@ -456,13 +557,13 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Dashboard header
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -472,12 +573,12 @@ class _AdminScreenState extends State<AdminScreen> {
                     AppColors.surface,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 3),
                   ),
                 ],
                 border: Border.all(
@@ -487,20 +588,20 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [AppColors.primary, AppColors.primaryDark],
                       ),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       Icons.dashboard,
                       color: Colors.white,
-                      size: 28,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,19 +609,21 @@ class _AdminScreenState extends State<AdminScreen> {
                         Text(
                           'Dashboard Overview',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textDark,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           'Managing ${widget.selectedUserName}',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14,
                             color: AppColors.textDark.withValues(alpha: 0.7),
                             fontWeight: FontWeight.w500,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -529,81 +632,30 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             
             _buildUserBalanceCard(),
-            const SizedBox(height: 20),
+            RSpacing.height(12),
             _buildStatsRow(),
-            const SizedBox(height: 24),
-            _buildQuickActionsGrid(),
-            const SizedBox(height: 32),
-            
-            // Main Action Cards Section
-            Text(
-              'Add Tasks & Transactions',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 16),
+            RSpacing.height(20),
             
             Row(
               children: [
                 Expanded(child: _buildAddTaskCard()),
-                const SizedBox(width: 16),
+                RSpacing.width(16),
                 Expanded(child: _buildAddTransactionCard()),
               ],
             ),
             
             const SizedBox(height: 32),
             
-            // Activity and Insights Section
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Recent Activity',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildRecentActivityCard(),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  flex: 1,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Achievements',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAchievementsCard(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            _buildRecentActivityCard(),
             
-            const SizedBox(height: 24),
+            RSpacing.height(24),
+            
+            _buildAchievementsCard(),
+            
+            RSpacing.height(24),
             _buildTasksList(),
             const SizedBox(height: 24),
             _buildTransactionsList(),
@@ -626,7 +678,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return _buildStatCard('Pending Tasks', '0', Icons.pending_actions, AppColors.accent);
+                    return _buildStatCard('Pending Tasks', '0', Icons.pending_actions, const Color.fromARGB(255, 183, 233, 84));
                   }
                   
                   // Filter tasks by userId - include null/empty for backward compatibility
@@ -648,7 +700,7 @@ class _AdminScreenState extends State<AdminScreen> {
                     'Pending Tasks',
                     pendingTasks.toString(),
                     Icons.pending_actions,
-                    AppColors.accent,
+                    const Color.fromARGB(255, 166, 224, 50),
                   );
                 },
               ),
@@ -884,15 +936,15 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
         border: Border.all(
@@ -902,35 +954,40 @@ class _AdminScreenState extends State<AdminScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
               color: color,
-              size: 24,
+              size: 18,
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 10,
               color: AppColors.textDark.withValues(alpha: 0.7),
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
           ),
         ],
       ),
@@ -1160,7 +1217,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildAddTaskCard() {
     return Container(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(14.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1181,65 +1238,73 @@ class _AdminScreenState extends State<AdminScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.add_task, color: AppColors.primary, size: 20),
+                child: Icon(Icons.add_task, color: AppColors.primary, size: 18),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Add Task',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Add Task',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           TextField(
             controller: _taskController,
             decoration: InputDecoration(
               labelText: 'Task Name',
-              labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
+              labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7), fontSize: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppColors.textDark.withValues(alpha: 0.3)),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: AppColors.primary, width: 2),
               ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
+            style: const TextStyle(fontSize: 14),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
+                flex: 3,
                 child: DropdownButtonFormField<String>(
                   value: _selectedTaskType,
                   decoration: InputDecoration(
                     labelText: 'Type',
-                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
+                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7), fontSize: 11),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: AppColors.primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    isDense: true,
                   ),
+                  style: const TextStyle(fontSize: 12, color: Colors.black),
                   items: ['Task', 'Chore', 'Goal']
                       .map((type) => DropdownMenuItem(
                             value: type,
-                            child: Text(type),
+                            child: Text(type, style: const TextStyle(fontSize: 12)),
                           ))
                       .toList(),
                   onChanged: (value) {
@@ -1249,28 +1314,31 @@ class _AdminScreenState extends State<AdminScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 6),
               Expanded(
+                flex: 2,
                 child: TextField(
                   controller: _rewardController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Reward (₱)',
-                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
+                    labelText: '₱',
+                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7), fontSize: 11),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: AppColors.primary, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    isDense: true,
                   ),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -1278,15 +1346,15 @@ class _AdminScreenState extends State<AdminScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 elevation: 0,
               ),
               child: const Text(
                 'Add Task',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -1297,7 +1365,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildAddTransactionCard() {
     return Container(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1318,48 +1386,55 @@ class _AdminScreenState extends State<AdminScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppColors.accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.attach_money, color: AppColors.accent, size: 20),
+                child: Icon(Icons.attach_money, color: AppColors.accent, size: 16),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Add Transaction',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Add Transaction',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
+                flex: 3,
                 child: DropdownButtonFormField<String>(
                   value: _selectedTransactionType,
                   decoration: InputDecoration(
                     labelText: 'Type',
-                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
+                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7), fontSize: 10),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.accent, width: 2),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: const Color.fromARGB(255, 186, 243, 71), width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    isDense: true,
                   ),
+                  style: const TextStyle(fontSize: 11, color: Colors.black),
                   items: ['Allowance', 'Purchase', 'Deposit', 'Withdrawal']
                       .map((type) => DropdownMenuItem(
                             value: type,
-                            child: Text(type),
+                            child: Text(type, style: const TextStyle(fontSize: 11)),
                           ))
                       .toList(),
                   onChanged: (value) {
@@ -1369,44 +1444,47 @@ class _AdminScreenState extends State<AdminScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 4),
               Expanded(
+                flex: 2,
                 child: TextField(
                   controller: _transactionController,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: 'Amount (₱)',
-                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
+                    labelText: '₱',
+                    labelStyle: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7), fontSize: 10),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(color: AppColors.accent, width: 2),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    isDense: true,
                   ),
+                  style: const TextStyle(fontSize: 11),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: _addTransaction,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
+                backgroundColor: const Color.fromARGB(255, 111, 133, 68),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 elevation: 0,
               ),
               child: const Text(
                 'Add Transaction',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -1513,17 +1591,18 @@ class _AdminScreenState extends State<AdminScreen> {
                 );
               }
 
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: userTasks.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
+              return Container(
+                height: 300, // Fixed height to make it scrollable
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: userTasks.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
                   final doc = userTasks[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final taskName = data['taskName'] as String? ?? data['title'] as String? ?? 'Unnamed Task';
                   final taskType = data['taskType'] as String? ?? 'Task';
-                  final isCompleted = data['isCompleted'] as bool? ?? false;
+                  final isCompleted = data['isCompleted'] as bool? ?? data['completed'] as bool? ?? false;
 
                   // Handle both string and numeric reward formats
                   double reward = 0.0;
@@ -1546,75 +1625,188 @@ class _AdminScreenState extends State<AdminScreen> {
                         color: isCompleted ? AppColors.success : AppColors.textDark.withValues(alpha: 0.3),
                       ),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Icon(
-                          isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                          color: isCompleted ? AppColors.success : AppColors.textDark,
-                          size: 24,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [                                Text(
-                                  taskName,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textDark,
-                                    decoration: isCompleted ? TextDecoration.lineThrough : null,
-                                  ),
-                                ),
-                              const SizedBox(height: 4),
-                              Row(
+                        Row(
+                          children: [
+                            Icon(
+                              isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                              color: isCompleted ? AppColors.success : AppColors.textDark,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                  Text(
+                                    taskName,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textDark,
+                                      decoration: isCompleted ? TextDecoration.lineThrough : null,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          taskType,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '₱${reward.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: const Color.fromARGB(255, 173, 224, 72),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (!isCompleted) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () => _markTaskCompleted(doc.id, reward),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.success,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  ),
+                                  child: const Text('Complete'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: Text(
+                                  'Delete Task',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                content: Text(
+                                  'Are you sure you want to delete "$taskName"? This will also remove any related transactions.',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
                                     child: Text(
-                                      taskType,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      'Cancel',
+                                      style: TextStyle(color: AppColors.primary),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '₱${reward.toStringAsFixed(2)}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.accent,
-                                      fontWeight: FontWeight.bold,
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.white),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            );
+                            if (confirm == true) {
+                              await _deleteTaskAndTransactions(doc.id, taskName);
+                            }
+                          },
                         ),
-                        if (!isCompleted)
-                          ElevatedButton(
-                            onPressed: () => _markTaskCompleted(doc.id, reward),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.success,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            ),
-                            child: const Text('Complete'),
-                          ),
                       ],
                     ),
-                  );
+                  ] else ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.delete),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: Text(
+                                  'Delete Task',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                content: Text(
+                                  'Are you sure you want to delete "$taskName"?',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(color: AppColors.primary),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await _deleteTaskAndTransactions(doc.id, taskName);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
                 },
+                ),
               );
             },
           ),
@@ -1642,7 +1834,7 @@ class _AdminScreenState extends State<AdminScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.history, color: AppColors.accent, size: 24),
+              Icon(Icons.history, color: AppColors.primary, size: 24),
               const SizedBox(width: 12),
               Text(
                 'Recent Transactions',
@@ -1674,14 +1866,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       Icon(
                         Icons.history,
                         size: 48,
-                        color: AppColors.textDark,
+                        color: AppColors.textDark.withValues(alpha: 0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No transactions yet',
                         style: TextStyle(
                           fontSize: 16,
-                          color: AppColors.textDark,
+                          color: AppColors.textDark.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -1689,7 +1881,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 );
               }
 
-              // Filter transactions by userId - include null/empty for backward compatibility
+              // Filter transactions by userId
               final allTransactions = snapshot.data?.docs ?? [];
               final userTransactions = allTransactions.where((doc) {
                 final data = doc.data() as Map<String, dynamic>;
@@ -1707,14 +1899,14 @@ class _AdminScreenState extends State<AdminScreen> {
                       Icon(
                         Icons.history,
                         size: 48,
-                        color: AppColors.textDark,
+                        color: AppColors.textDark.withValues(alpha: 0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No transactions yet',
                         style: TextStyle(
                           fontSize: 16,
-                          color: AppColors.textDark,
+                          color: AppColors.textDark.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -1722,12 +1914,13 @@ class _AdminScreenState extends State<AdminScreen> {
                 );
               }
 
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: userTransactions.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
+              return Container(
+                height: 400, // Fixed height to make it scrollable
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: userTransactions.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
                   final doc = userTransactions[index];
                   final data = doc.data() as Map<String, dynamic>;
                   final type = data['type'] as String? ?? 'Transaction';
@@ -1741,7 +1934,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   if (amountData is num) {
                     amount = amountData.toDouble();
                   } else if (amountData is String) {
-                    // Parse string amounts like "+200" or "-100"
                     final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
                     amount = double.tryParse(cleanAmount) ?? 0.0;
                   }
@@ -1750,7 +1942,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       type.toLowerCase().contains('reward') ||
                       type.toLowerCase().contains('deposit');
 
-                  // Use the helper function to get display name
                   final displayName = _getTransactionDisplayName(data);
 
                   return Container(
@@ -1795,24 +1986,72 @@ class _AdminScreenState extends State<AdminScreen> {
                                   '${timestamp.toDate().day}/${timestamp.toDate().month}/${timestamp.toDate().year}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textDark,
+                                    color: AppColors.textDark.withValues(alpha: 0.6),
                                   ),
                                 ),
                             ],
                           ),
                         ),
                         Text(
-                          '${isPositive ? '+' : '-'}₱${amount.toStringAsFixed(2)}',
+                          '${isPositive ? '+' : '-'}₱${amount.abs().toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: isPositive ? AppColors.success : AppColors.error,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete, size: 18),
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                title: Text(
+                                  'Delete Transaction',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                content: Text(
+                                  'Are you sure you want to delete this transaction? If this is a task reward, the related task will be reset to incomplete.',
+                                  style: TextStyle(color: AppColors.textDark),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: Text(
+                                      'Cancel',
+                                      style: TextStyle(color: AppColors.primary),
+                                    ),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              await _deleteTransactionAndResetTask(doc.id, data);
+                            }
+                          },
+                        ),
                       ],
                     ),
                   );
                 },
+                ),
               );
             },
           ),
@@ -1821,408 +2060,165 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _buildQuickActionsGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-        const SizedBox(height: 16),
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 1.8,
-          children: [
-            _buildQuickActionCard(
-              title: 'Switch User',
-              subtitle: 'Select different child',
-              icon: Icons.switch_account,
-              color: AppColors.primary,
-              onTap: () async {
-                final result = await Navigator.pushNamed(context, '/userManagement');
-                if (result != null && result is Map<String, dynamic>) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AdminScreen(
-                        selectedUserId: result['id'],
-                        selectedUserName: result['name'],
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-            _buildQuickActionCard(
-              title: 'Add User',
-              subtitle: 'Register new child',
-              icon: Icons.person_add,
-              color: AppColors.accent,
-              onTap: () async {
-                await Navigator.pushNamed(context, '/userManagement');
-              },
-            ),
-            _buildQuickActionCard(
-              title: 'Quick Allowance',
-              subtitle: 'Add weekly allowance',
-              icon: Icons.savings,
-              color: AppColors.success,
-              onTap: () {
-                _showQuickAllowanceDialog();
-              },
-            ),
-            _buildQuickActionCard(
-              title: 'View Reports',
-              subtitle: 'Analytics & insights',
-              icon: Icons.analytics,
-              color: Colors.purple,
-              onTap: () {
-                _showComingSoonDialog('Reports & Analytics');
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActionCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.15),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: color.withValues(alpha: 0.2),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textDark.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showQuickAllowanceDialog() {
-    final TextEditingController allowanceController = TextEditingController(text: '10.00');
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.savings, color: AppColors.success, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Quick Allowance',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Add weekly allowance for ${widget.selectedUserName}',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textDark.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: allowanceController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Allowance Amount (₱)',
-                prefixIcon: Icon(Icons.attach_money, color: AppColors.success),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.success, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: AppColors.textDark.withValues(alpha: 0.7)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = double.tryParse(allowanceController.text);
-              if (amount != null && amount > 0) {
-                try {
-                  await FirebaseFirestore.instance.collection('transactions').add({
-                    'userId': widget.selectedUserId,
-                    'type': 'Weekly Allowance',
-                    'amount': amount,
-                    'description': 'Weekly allowance payment',
-                    'timestamp': FieldValue.serverTimestamp(),
-                  });
-                  Navigator.pop(context);
-                  _showSnackBar('Weekly allowance of ₱${amount.toStringAsFixed(2)} added!');
-                } catch (e) {
-                  _showSnackBar('Error adding allowance: $e');
-                }
-              } else {
-                _showSnackBar('Please enter a valid amount');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.success,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Add Allowance'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showComingSoonDialog(String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.construction, color: Colors.orange, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Coming Soon!',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$feature feature is currently under development.',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textDark.withValues(alpha: 0.7),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Stay tuned for exciting updates!',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textDark.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Got it!'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRecentActivityCard() {
     return Container(
-      height: 400,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.1),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.timeline, color: AppColors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
+              Icon(Icons.history, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
               Text(
-                'Activity Feed',
+                'Recent Activity',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                   color: AppColors.textDark,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: StreamBuilder<List<QuerySnapshot>>(
-              stream: _getCombinedActivityStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          const SizedBox(height: 12),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('transactions')
+                .orderBy('timestamp', descending: true)
+                .limit(10)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                if (!snapshot.hasData) {
-                  return _buildEmptyActivityState();
-                }
+              if (!snapshot.hasData) {
+                return Text(
+                  'No recent activity',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDark.withValues(alpha: 0.6),
+                  ),
+                );
+              }
 
-                final activities = _combineActivities(snapshot.data!);
-                
-                if (activities.isEmpty) {
-                  return _buildEmptyActivityState();
-                }
+              // Filter transactions by userId - include null/empty for backward compatibility
+              final allTransactions = snapshot.data?.docs ?? [];
+              final userTransactions = allTransactions.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final userId = data['userId'] as String?;
+                return userId == widget.selectedUserId || 
+                       userId == null || 
+                       (userId.isEmpty);
+              }).toList(); // Show all matching transactions instead of limiting to 3
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Activity count indicator
-                    if (activities.length > 5)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+              if (userTransactions.isEmpty) {
+                return Text(
+                  'No recent activity',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textDark.withValues(alpha: 0.6),
+                  ),
+                );
+              }
+
+              return Container(
+                height: 200, // Fixed height to make it scrollable
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: userTransactions.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final type = data['type'] as String? ?? 'Transaction';
+                      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+                      final description = data['description'] as String? ?? '';
+                      final timestamp = data['timestamp'] as Timestamp?;
+                      
+                      String timeAgo = 'Just now';
+                      if (timestamp != null) {
+                        final diff = DateTime.now().difference(timestamp.toDate());
+                        if (diff.inDays > 0) {
+                          timeAgo = '${diff.inDays}d ago';
+                        } else if (diff.inHours > 0) {
+                          timeAgo = '${diff.inHours}h ago';
+                        } else if (diff.inMinutes > 0) {
+                          timeAgo = '${diff.inMinutes}m ago';
+                        }
+                      }
+
+                      IconData icon = Icons.monetization_on;
+                      Color iconColor = AppColors.primary;
+                      
+                      if (type == 'Task Reward') {
+                        icon = Icons.task_alt;
+                        iconColor = AppColors.success;
+                      } else if (type == 'Purchase') {
+                        icon = Icons.shopping_cart;
+                        iconColor = AppColors.error;
+                      } else if (type == 'Withdrawal') {
+                        icon = Icons.account_balance_wallet;
+                        iconColor = AppColors.error;
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         child: Row(
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 16,
-                              color: AppColors.primary.withValues(alpha: 0.7),
+                            Icon(icon, size: 14, color: iconColor),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    description.length > 25 ? '${description.substring(0, 25)}...' : description,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textDark,
+                                    ),
+                                  ),
+                                  Text(
+                                    timeAgo,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textDark.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            const SizedBox(width: 4),
                             Text(
-                              '${activities.length} activities • Scroll to see more',
+                              '₱${amount.toStringAsFixed(2)}',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.primary.withValues(alpha: 0.7),
-                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: amount >= 0 ? AppColors.success : AppColors.error,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    // Scrollable activity list
-                    Expanded(
-                      child: Scrollbar(
-                        thumbVisibility: true,
-                        child: ListView.separated(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: activities.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final activity = activities[index];
-                            return _buildActivityItem(activity);
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -2231,467 +2227,262 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildAchievementsCard() {
     return Container(
-      height: 400,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(
-          color: Colors.amber.withValues(alpha: 0.2),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.emoji_events, color: Colors.amber, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Milestones',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+              Icon(Icons.emoji_events, color: AppColors.accent, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Achievements',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('tasks')
-                  .where('userId', isEqualTo: widget.selectedUserId)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final achievements = _calculateAchievements(snapshot.data!.docs);
-                
-                return ListView.separated(
-                  itemCount: achievements.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final achievement = achievements[index];
-                    return _buildAchievementItem(achievement);
-                  },
+          const SizedBox(height: 12),
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('tasks')
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tasks Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDark.withValues(alpha: 0.7),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              }
 
-  Stream<List<QuerySnapshot>> _getCombinedActivityStream() {
-    final tasksStream = FirebaseFirestore.instance
-        .collection('tasks')
-        .orderBy('createdAt', descending: true)
-        .limit(10)
-        .snapshots();
-    
-    final transactionsStream = FirebaseFirestore.instance
-        .collection('transactions')
-        .orderBy('timestamp', descending: true)
-        .limit(10)
-        .snapshots();
+              if (!snapshot.hasData) {
+                return Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tasks Completed',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textDark.withValues(alpha: 0.7),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '0',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
 
-    return tasksStream.asyncMap((tasksSnapshot) async {
-      final transactionsSnapshot = await transactionsStream.first;
-      return [tasksSnapshot, transactionsSnapshot];
-    });
-  }
+              // Filter tasks by userId and count completed ones
+              final allTasks = snapshot.data?.docs ?? [];
+              final userTasks = allTasks.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final userId = data['userId'] as String?;
+                return userId == widget.selectedUserId || 
+                       userId == null || 
+                       (userId.isEmpty);
+              }).toList();
 
-  List<Map<String, dynamic>> _combineActivities(List<QuerySnapshot> snapshots) {
-    final List<Map<String, dynamic>> activities = [];
-    
-    // Add tasks - filter by userId
-    for (var doc in snapshots[0].docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final taskUserId = data['userId'] as String?;
-      
-      // Include tasks with matching userId or null/empty for backward compatibility
-      if (taskUserId == widget.selectedUserId || 
-          taskUserId == null || 
-          taskUserId.isEmpty) {
-        final timestamp = data['createdAt'] as Timestamp?;
-        if (timestamp != null) {
-          activities.add({
-            'type': 'task',
-            'timestamp': timestamp,
-            'data': data,
-            'id': doc.id,
-          });
-        }
-      }
-    }
-    
-    // Add transactions - filter by userId
-    for (var doc in snapshots[1].docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final txUserId = data['userId'] as String?;
-      
-      // Include transactions with matching userId
-      if (txUserId == widget.selectedUserId) {
-        final timestamp = data['timestamp'] as Timestamp?;
-        if (timestamp != null) {
-          activities.add({
-            'type': 'transaction',
-            'timestamp': timestamp,
-            'data': data,
-            'id': doc.id,
-          });
-        }
-      }
-    }
-    
-    // Sort by timestamp (newest first)
-    activities.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
-    
-    return activities;
-  }
+              final completedTasks = userTasks.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                return data['isCompleted'] as bool? ?? data['completed'] as bool? ?? false;
+              }).length;
 
-  Widget _buildActivityItem(Map<String, dynamic> activity) {
-    final type = activity['type'] as String;
-    final data = activity['data'] as Map<String, dynamic>;
-    final timestamp = activity['timestamp'] as Timestamp;
-    final timeAgo = _getTimeAgo(timestamp.toDate());
+              // Calculate streak (consecutive days with completed tasks)
+              int currentStreak = 0;
+              final now = DateTime.now();
+              for (int i = 0; i < 30; i++) {
+                final checkDate = now.subtract(Duration(days: i));
+                final hasTaskThisDay = userTasks.any((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final isCompleted = data['isCompleted'] as bool? ?? data['completed'] as bool? ?? false;
+                  final completedAt = data['completedAt'] as Timestamp?;
+                  
+                  if (!isCompleted || completedAt == null) return false;
+                  
+                  final completedDate = completedAt.toDate();
+                  return completedDate.year == checkDate.year &&
+                         completedDate.month == checkDate.month &&
+                         completedDate.day == checkDate.day;
+                });
+                
+                if (hasTaskThisDay) {
+                  currentStreak++;
+                } else if (i > 0) {
+                  break;
+                }
+              }
 
-    if (type == 'task') {
-      final taskName = data['taskName'] as String? ?? data['title'] as String? ?? 'Unnamed Task';
-      final isCompleted = data['isCompleted'] as bool? ?? false;
-      
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isCompleted ? AppColors.success.withValues(alpha: 0.1) : AppColors.accent.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isCompleted ? AppColors.success.withValues(alpha: 0.3) : AppColors.accent.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isCompleted ? Icons.task_alt : Icons.add_task,
-              color: isCompleted ? AppColors.success : AppColors.accent,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              return Column(
                 children: [
-                  Text(
-                    isCompleted ? 'Completed: $taskName' : 'Added: $taskName',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textDark,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.check_circle, size: 16, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tasks Completed',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textDark.withValues(alpha: 0.7),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '$completedTasks',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    timeAgo,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textDark.withValues(alpha: 0.6),
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.local_fire_department, size: 16, color: const Color.fromARGB(255, 240, 84, 57)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Current Streak',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textDark.withValues(alpha: 0.7),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '$currentStreak',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      final data = activity['data'] as Map<String, dynamic>;
-      final displayName = _getTransactionDisplayName(data);
-      final amount = _parseAmount(data['amount']);
-      final type = data['type'] as String? ?? '';
-      
-      // Determine if this is earning or spending based on transaction type
-      final isPositive = type.toLowerCase().contains('allowance') || 
-                        type.toLowerCase().contains('reward') || 
-                        type.toLowerCase().contains('deposit');
-      
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isPositive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isPositive ? AppColors.success.withValues(alpha: 0.3) : AppColors.error.withValues(alpha: 0.3),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isPositive ? Icons.add_circle : Icons.remove_circle,
-              color: isPositive ? AppColors.success : AppColors.error,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$displayName: ${isPositive ? '+' : '-'}₱${amount.abs().toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  Text(
-                    timeAgo,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textDark.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  Widget _buildEmptyActivityState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.timeline,
-            size: 48,
-            color: AppColors.textDark.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No recent activity',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textDark.withValues(alpha: 0.5),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Tasks and transactions will appear here',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textDark.withValues(alpha: 0.4),
-            ),
+              );
+            },
           ),
         ],
       ),
     );
-  }
-
-  List<Map<String, dynamic>> _calculateAchievements(List<QueryDocumentSnapshot> tasks) {
-    final achievements = <Map<String, dynamic>>[];
-    final completedTasks = tasks.where((t) => (t.data() as Map)['isCompleted'] == true).length;
-    final totalTasks = tasks.length;
-    
-    // Task completion milestones
-    if (completedTasks >= 1) {
-      achievements.add({
-        'title': 'First Task',
-        'description': 'Completed first task!',
-        'icon': Icons.star,
-        'color': Colors.amber,
-        'achieved': true,
-      });
-    }
-    
-    if (completedTasks >= 5) {
-      achievements.add({
-        'title': 'Task Master',
-        'description': 'Completed 5 tasks',
-        'icon': Icons.workspace_premium,
-        'color': Colors.purple,
-        'achieved': true,
-      });
-    }
-    
-    if (completedTasks >= 10) {
-      achievements.add({
-        'title': 'Hard Worker',
-        'description': 'Completed 10 tasks',
-        'icon': Icons.military_tech,
-        'color': Colors.blue,
-        'achieved': true,
-      });
-    }
-    
-    // Completion rate achievements
-    if (totalTasks > 0) {
-      final completionRate = completedTasks / totalTasks;
-      if (completionRate >= 0.8) {
-        achievements.add({
-          'title': 'Perfectionist',
-          'description': '80%+ completion rate',
-          'icon': Icons.emoji_events,
-          'color': Colors.green,
-          'achieved': true,
-        });
-      }
-    }
-    
-    // Future achievements (not yet achieved)
-    if (completedTasks < 20) {
-      achievements.add({
-        'title': 'Super Star',
-        'description': 'Complete 20 tasks',
-        'icon': Icons.star_border,
-        'color': Colors.grey,
-        'achieved': false,
-      });
-    }
-    
-    return achievements;
-  }
-
-  Widget _buildAchievementItem(Map<String, dynamic> achievement) {
-    final isAchieved = achievement['achieved'] as bool;
-    final color = achievement['color'] as Color;
-    
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isAchieved ? color.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isAchieved ? color.withValues(alpha: 0.3) : Colors.grey.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            achievement['icon'] as IconData,
-            color: isAchieved ? color : Colors.grey,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  achievement['title'] as String,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isAchieved ? AppColors.textDark : AppColors.textDark.withValues(alpha: 0.5),
-                  ),
-                ),
-                Text(
-                  achievement['description'] as String,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isAchieved ? AppColors.textDark.withValues(alpha: 0.7) : AppColors.textDark.withValues(alpha: 0.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (isAchieved)
-            Icon(
-              Icons.check_circle,
-              color: color,
-              size: 16,
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _getTimeAgo(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-    
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${(difference.inDays / 7).floor()}w ago';
-    }
-  }
-
-  double _parseAmount(dynamic amountData) {
-    if (amountData is num) {
-      return amountData.toDouble();
-    } else if (amountData is String) {
-      final cleanAmount = amountData.replaceAll(RegExp(r'[^\d.-]'), '');
-      return double.tryParse(cleanAmount) ?? 0.0;
-    }
-    return 0.0;
   }
 
   String _getTransactionDisplayName(Map<String, dynamic> data) {
-    // Use the same logic as user transaction history: name ?? description ?? fallback
-    final name = data['name'] as String?;
-    final description = data['description'] as String?;
-    
-    // First priority: name field
-    if (name != null && name.isNotEmpty) {
-      return name;
-    }
-    
-    // Second priority: description field
-    if (description != null && description.isNotEmpty) {
-      return description;
-    }
-    
-    // Fallback to type-based naming
     final type = data['type'] as String? ?? '';
+    final amount = data['amount'] as num? ?? 0;
+    final taskName = data['taskName'] as String? ?? 'Unknown Task';
     
-    switch (type.toLowerCase()) {
-      case 'task reward':
-      case 'task_reward':
-        return 'Task Completion Reward';
+    switch (type) {
+      case 'task_completion':
+        return 'Completed: $taskName (+\$${amount.toStringAsFixed(2)})';
       case 'allowance':
-        return 'Weekly Allowance';
+        return 'Weekly Allowance (+\$${amount.toStringAsFixed(2)})';
       case 'bonus':
-        return 'Bonus Payment';
-      case 'gift':
-        return 'Gift Money';
-      case 'purchase':
-        return 'Purchase';
-      case 'savings':
-        return 'Money Saved';
-      case 'withdrawal':
-        return 'Money Withdrawal';
-      case 'deposit':
-        return 'Money Deposit';
+        return 'Bonus (+\$${amount.toStringAsFixed(2)})';
+      case 'penalty':
+        return 'Penalty (-\$${amount.abs().toStringAsFixed(2)})';
       default:
-        return type.isNotEmpty ? type : 'Transaction';
+        return 'Transaction (\$${amount.toStringAsFixed(2)})';
     }
   }
 }
