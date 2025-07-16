@@ -1,5 +1,5 @@
-name: allowance_manager
-description: "A new Flutter project."
+name: paygoal
+description: "PayGoal - Smart allowance and goal tracking app for families."
 publish_to: 'none'
 version: 0.1.0
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^2.30.0
+  firebase_core: ^2.32.0
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.17.0
 
@@ -20,3 +20,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

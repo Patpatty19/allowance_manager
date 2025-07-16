@@ -1,6 +1,6 @@
 {
-    "name": "allowance_manager",
-    "short_name": "allowance_manager",
+    "name": "PayGoal",
+    "short_name": "PayGoal",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

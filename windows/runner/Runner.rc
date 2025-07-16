@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "allowance_manager" "\0"
+            VALUE "FileDescription", "PayGoal" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "allowance_manager" "\0"
+            VALUE "InternalName", "paygoal" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "allowance_manager.exe" "\0"
-            VALUE "ProductName", "allowance_manager" "\0"
+            VALUE "OriginalFilename", "paygoal.exe" "\0"
+            VALUE "ProductName", "PayGoal" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
