@@ -1,0 +1,1 @@
+{"inputs":["D:\\paygoal_deploy\\web\\*\\index.html","D:\\paygoal_deploy\\web\\flutter_bootstrap.js","C:\\flutter\\bin\\cache\\engine.stamp"],"outputs":["D:\\paygoal_deploy\\build\\web\\*\\index.html","D:\\paygoal_deploy\\build\\web\\flutter_bootstrap.js"],"buildKey":"[{\"compileTarget\":\"dart2js\",\"renderer\":\"canvaskit\",\"mainJsPath\":\"main.dart.js\"}]"}
